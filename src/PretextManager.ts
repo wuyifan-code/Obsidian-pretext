@@ -1,0 +1,118 @@
+import { MeasurementCache } from './MeasurementCache';
+
+// Pretext type definitions (matching @chenglou/pretext API)
+type PreparedText = unknown;
+type LayoutResult = { height: number; lineCount: number };
+type LayoutLinesResult = LayoutResult & {
+	lines: Array<{ text: string; width: number; start: { segmentIndex: number; graphemeIndex: number }; end: { segmentIndex: number; graphemeIndex: number } }>;
+};
+
+interface FontInfo {
+	fontFamily: string;
+	fontSize: number;
+	fontWeight: number;
+	lineHeight: number;
+}
+
+declare global {
+	interface Window {
+		Pretext?: {
+			prepare: (text: string, font: string, options?: { whiteSpace?: string }) => PreparedText;
+			prepareWithSegments: (text: string, font: string, options?: { whiteSpace?: string }) => PreparedText;
+			layout: (prepared: PreparedText, maxWidth: number, lineHeight: number) => LayoutResult;
+			layoutWithLines: (prepared: PreparedText, maxWidth: number, lineHeight: number) => LayoutLinesResult;
+			walkLineRanges: (prepared: PreparedText, maxWidth: number, onLine: (line: { width: number; start: { segmentIndex: number; graphemeIndex: number }; end: { segmentIndex: number; graphemeIndex: number } }) => void) => number;
+			clearCache: () => void;
+		};
+	}
+}
+
+export class PretextManager {
+	private cache: MeasurementCache;
+	private loaded = false;
+	private loadFailed = false;
+
+	constructor(cache: MeasurementCache) {
+		this.cache = cache;
+	}
+
+	async initialize(): Promise<void> {
+		// Pretext bundle is loaded via styles.css injection
+		// Wait a tick for the script to execute
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		if (window.Pretext) {
+			this.loaded = true;
+			console.log('[PretextManager] Pretext library loaded successfully.');
+		} else {
+			this.loadFailed = true;
+			console.warn('[PretextManager] Pretext not available, performance may not improve.');
+		}
+	}
+
+	prepare(text: string, font: FontInfo): PreparedText | null {
+		if (!this.loaded || !window.Pretext) return null;
+
+		try {
+			return window.Pretext.prepare(text, font.fontFamily, {
+				whiteSpace: 'normal',
+			});
+		} catch (err) {
+			console.warn('[PretextManager] prepare() failed:', err);
+			return null;
+		}
+	}
+
+	layout(prepared: PreparedText, maxWidth: number, lineHeight: number): LayoutResult | null {
+		if (!this.loaded || !window.Pretext || !prepared) return null;
+
+		try {
+			// Check cache first
+			// We use a composite approach: Pretext's layout is cached by our MeasurementCache
+			return window.Pretext.layout(prepared, maxWidth, lineHeight);
+		} catch (err) {
+			console.warn('[PretextManager] layout() failed:', err);
+			return null;
+		}
+	}
+
+	layoutWithLines(prepared: PreparedText, maxWidth: number, lineHeight: number): LayoutLinesResult | null {
+		if (!this.loaded || !window.Pretext || !prepared) return null;
+
+		try {
+			return window.Pretext.layoutWithLines(prepared, maxWidth, lineHeight);
+		} catch (err) {
+			console.warn('[PretextManager] layoutWithLines() failed:', err);
+			return null;
+		}
+	}
+
+	walkLineRanges(
+		prepared: PreparedText,
+		maxWidth: number,
+		onLine: (line: { width: number; start: { segmentIndex: number; graphemeIndex: number }; end: { segmentIndex: number; graphemeIndex: number } }) => void
+	): void {
+		if (!this.loaded || !window.Pretext || !prepared) return;
+
+		try {
+			window.Pretext.walkLineRanges(prepared, maxWidth, onLine);
+		} catch (err) {
+			console.warn('[PretextManager] walkLineRanges() failed:', err);
+		}
+	}
+
+	clearCache(): void {
+		this.cache.clear();
+		if (this.loaded && window.Pretext) {
+			window.Pretext.clearCache();
+		}
+	}
+
+	isReady(): boolean {
+		return this.loaded;
+	}
+
+	hasFailed(): boolean {
+		return this.loadFailed;
+	}
+}

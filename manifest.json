@@ -1,0 +1,11 @@
+{
+	"id": "obsidian-pretext",
+	"name": "Pretext Optimizer",
+	"version": "0.1.0",
+	"minAppVersion": "1.4.0",
+	"description": "Integrates Pretext library to reduce DOM measurement overhead in Obsidian's rendering pipeline, improving performance for large documents.",
+	"author": "You",
+	"authorUrl": "",
+	"fundingUrl": "",
+	"isDesktopOnly": false
+}
