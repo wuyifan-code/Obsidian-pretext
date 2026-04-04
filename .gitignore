@@ -4,6 +4,15 @@ node_modules/
 # Build output
 main.js
 
+# Release files
+release/
+
+# Test files
+test-*.js
+
+# Build scripts
+build-*.js
+
 # Environment variables
 .env
 

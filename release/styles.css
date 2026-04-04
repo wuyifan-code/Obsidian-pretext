@@ -1,6 +1,0 @@
-/* Pretext Optimizer - Minimal Styles */
-
-[data-pretext-optimized] {
-	/* Smooth transition when height is applied */
-	transition: min-height 0.1s ease-out;
-}
