@@ -2,6 +2,7 @@ import { Plugin } from 'obsidian';
 import { PretextManager } from './src/PretextManager';
 import { MeasurementCache } from './src/MeasurementCache';
 import { createMarkdownPostProcessor } from './src/hooks/MarkdownPostProcessor';
+import { HEAVY_SELECTORS, processHeavyElement } from './src/hooks/HeavyElementOptimizer';
 
 // Pretext bundle is injected at build time
 declare const INJECT_PRETEXT_BUNDLE: string;
@@ -9,6 +10,7 @@ declare const INJECT_PRETEXT_BUNDLE: string;
 export default class ObsidianPretextPlugin extends Plugin {
 	private pretextManager!: PretextManager;
 	private measurementCache!: MeasurementCache;
+	private resizeObserver!: ResizeObserver;
 
 	async onload() {
 		console.log('[Pretext Optimizer] Loading plugin...');
@@ -33,6 +35,9 @@ export default class ObsidianPretextPlugin extends Plugin {
 
 		// Try to register CodeMirror extension if available (Obsidian 1.5+)
 		this.tryRegisterCodeMirrorExtension();
+
+		// Initialize ResizeObserver for heavy elements
+		this.initializeResizeObserver();
 
 		console.log('[Pretext Optimizer] Plugin loaded successfully.');
 	}
@@ -79,9 +84,62 @@ export default class ObsidianPretextPlugin extends Plugin {
 		}
 	}
 
+	private initializeResizeObserver(): void {
+		if (!this.pretextManager.isReady()) {
+			return;
+		}
+
+		this.resizeObserver = new ResizeObserver((entries) => {
+			entries.forEach((entry) => {
+				const el = entry.target as HTMLElement;
+				const currentWidth = entry.contentRect.width;
+				const previousWidth = parseFloat(el.getAttribute('data-pretext-width') || '0');
+
+				// Only reprocess if width changed significantly (more than 10px)
+				if (Math.abs(currentWidth - previousWidth) > 10) {
+					processHeavyElement(el, this.pretextManager, this.measurementCache, currentWidth);
+				}
+			});
+		});
+
+		// Start observing heavy elements
+		this.observeHeavyElements();
+
+		// Register a callback to observe new elements when DOM changes
+		const observer = new MutationObserver(() => {
+			this.observeHeavyElements();
+		});
+
+		observer.observe(document.body, {
+			childList: true,
+			subtree: true,
+		});
+
+		// Clean up observer on unload
+		this.register(() => observer.disconnect());
+	}
+
+	private observeHeavyElements(): void {
+		if (!this.resizeObserver || !this.pretextManager.isReady()) {
+			return;
+		}
+
+		// Find and observe heavy elements
+		for (const selector of HEAVY_SELECTORS) {
+			const elements = document.querySelectorAll<HTMLElement>(selector);
+			elements.forEach((el) => {
+				// Only observe elements that have been optimized
+				if (el.hasAttribute('data-pretext-optimized')) {
+					this.resizeObserver.observe(el);
+				}
+			});
+		}
+	}
+
 	onunload() {
 		console.log('[Pretext Optimizer] Unloading plugin...');
 		this.pretextManager?.clearCache();
 		this.measurementCache?.clear();
+		this.resizeObserver?.disconnect();
 	}
 }
