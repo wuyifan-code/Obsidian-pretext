@@ -3,6 +3,7 @@ import { PretextManager } from './src/PretextManager';
 import { MeasurementCache } from './src/MeasurementCache';
 import { createMarkdownPostProcessor } from './src/hooks/MarkdownPostProcessor';
 import { HEAVY_SELECTORS, processHeavyElement } from './src/hooks/HeavyElementOptimizer';
+import { createPretextCodeMirrorExtension } from './src/hooks/CodeMirrorExtension';
 
 // Pretext bundle is injected at build time
 declare const INJECT_PRETEXT_BUNDLE: string;
@@ -68,14 +69,10 @@ export default class ObsidianPretextPlugin extends Plugin {
 		// Check if the method exists before calling
 		if (typeof (this as any).registerCodeMirrorExtension === 'function') {
 			try {
-				// Dynamically import the extension to avoid errors in older Obsidian
-				import('./src/hooks/CodeMirrorExtension').then(({ createPretextCodeMirrorExtension }) => {
-					const extension = createPretextCodeMirrorExtension(this.pretextManager, this.measurementCache);
-					(this as any).registerCodeMirrorExtension(extension);
-					console.log('[Pretext Optimizer] CodeMirror extension registered.');
-				}).catch(err => {
-					console.warn('[Pretext Optimizer] Failed to load CodeMirror extension:', err);
-				});
+				// Use static import to ensure dependencies are properly initialized
+				const extension = createPretextCodeMirrorExtension(this.pretextManager, this.measurementCache);
+				(this as any).registerCodeMirrorExtension(extension);
+				console.log('[Pretext Optimizer] CodeMirror extension registered.');
 			} catch (err) {
 				console.warn('[Pretext Optimizer] CodeMirror extension not available:', err);
 			}

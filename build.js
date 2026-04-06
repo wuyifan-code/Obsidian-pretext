@@ -10,11 +10,13 @@ esbuild.build({
   bundle: true,
   outfile: 'main.js',
   external: ['obsidian', '@codemirror/view', '@codemirror/state'],
-  platform: 'browser',
-  target: 'es2016',
+  format: 'cjs',
+  target: 'es2018',
   define: {
     'INJECT_PRETEXT_BUNDLE': JSON.stringify(pretextBundle)
   },
+  minify: false,
+  treeShaking: true,
 
   logLevel: 'info'
 }).catch(() => process.exit(1));

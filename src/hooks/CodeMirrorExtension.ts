@@ -1,17 +1,45 @@
-import { EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet } from '@codemirror/view'; 
-import { RangeSetBuilder, Annotation } from '@codemirror/state'; 
-import { PretextManager } from '../PretextManager'; 
-import { MeasurementCache } from '../MeasurementCache'; 
-import { getFontInfoFromElement } from '../utils/FontMetrics'; 
+import { PretextManager } from '../PretextManager';
+import { MeasurementCache } from '../MeasurementCache';
+import { getFontInfoFromElement } from '../utils/FontMetrics';
 
-// 声明一个自定义注解，用于在异步计算完成后安全地通知 CM6 触发视图更新 
-const MeasureCompleteAnnotation = Annotation.define<boolean>(); 
+// 类型声明
+type EditorView = any;
+type ViewPlugin = any;
+type DecorationSet = any;
+type RangeSetBuilder = any;
+type AnnotationType = any;
+
+// MeasureCompleteAnnotation 将在初始化时设置
+let MeasureCompleteAnnotation: AnnotationType; 
 
 // 类型补全，防止某些环境缺少 requestIdleCallback 的类型定义 
 type IdleDeadlineObj = { timeRemaining: () => number; didTimeout?: boolean }; 
 
 export function createPretextCodeMirrorExtension(pretextManager: PretextManager, cache: MeasurementCache) { 
-	 return ViewPlugin.fromClass( 
+	 // 延迟获取 CodeMirror 模块，而不是在模块加载时
+	 const EditorView = (window as any).CodeMirror?.view?.EditorView;
+	 const Decoration = (window as any).CodeMirror?.view?.Decoration;
+	 const RangeSetBuilder = (window as any).CodeMirror?.state?.RangeSetBuilder;
+	 
+	 // 如果 CodeMirror 不可用，返回一个空扩展
+	 if (!EditorView || !Decoration || !RangeSetBuilder) {
+	 	 console.error('[Pretext Optimizer] CodeMirror not available');
+	 	 return EditorView?.plugin?.of(() => ({
+	 	 	 decorations: () => Decoration?.none || {}
+	 	 })) || {};
+	 }
+	 
+	 // 初始化 MeasureCompleteAnnotation
+	 MeasureCompleteAnnotation = (window as any).CodeMirror?.state?.Annotation?.define?.() || {};
+	 
+	 // 获取 ViewPlugin
+	 const ViewPlugin = (window as any).CodeMirror?.view?.ViewPlugin;
+	 if (!ViewPlugin) {
+	 	 console.error('[Pretext Optimizer] ViewPlugin not available');
+	 	 return {};
+	 }
+	 
+	 return ViewPlugin.fromClass(
 	 	 class { 
 	 	 	 private view: EditorView; 
 	 	 	 public decorations: DecorationSet; 
