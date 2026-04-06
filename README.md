@@ -5,8 +5,8 @@
 ## 基本信息
 
 - **插件名称**: Pretext Optimizer
-- **版本**: 0.1.0
-- **作者**: You
+- **版本**: 1.1.0
+- **作者**: wuyifan-code 
 - **描述**: 集成 Pretext 库以减少 Obsidian 渲染管道中的 DOM 测量开销，提高大型文档的性能。
 
 ## ✨ 功能特点
@@ -15,7 +15,7 @@
 
 - **DOM 测量优化**: 使用 Pretext 库减少 DOM 测量开销，显著提升渲染性能
 - **Markdown 预览优化**: 提高 Markdown 预览的渲染速度和响应性
-- **CodeMirror 编辑器优化**: 支持 Obsidian 1.5+ 的 CodeMirror 编辑器性能优化
+- **CodeMirror 编辑器优化**: 支持 Obsidian 1.10+ 的 CodeMirror 编辑器性能优化
 - **智能缓存机制**: 实现测量结果缓存，避免重复计算，进一步提升性能
 - **大型文档支持**: 特别优化处理大型 Markdown 文档的性能
 
@@ -24,7 +24,7 @@
 - **显著性能提升**: 减少渲染时间，提高响应速度
 - **资源高效利用**: 降低 CPU 使用率，减少系统资源消耗
 - **无缝集成**: 无侵入性设计，与 Obsidian 原生功能完全兼容
-- **版本兼容**: 支持 Obsidian 1.4.0 及以上版本
+- **版本兼容**: 支持 Obsidian 1.10.0 及以上版本
 - **自动工作**: 启用后自动优化，无需手动配置
 
 ## 目录
@@ -43,7 +43,7 @@
 
 - **DOM 测量优化**: 使用 Pretext 库减少 DOM 测量开销
 - **Markdown 预览优化**: 提高 Markdown 预览的渲染性能
-- **CodeMirror 编辑器优化**: 支持 Obsidian 1.5+ 的 CodeMirror 编辑器优化
+- **CodeMirror 编辑器优化**: 支持 Obsidian 1.10+ 的 CodeMirror 编辑器优化
 - **缓存机制**: 实现测量缓存，避免重复计算
 - **大型文档支持**: 特别适合处理大型 Markdown 文档
 
@@ -52,7 +52,7 @@
 - 减少渲染时间，提高响应速度
 - 降低 CPU 使用率
 - 无侵入性设计，与 Obsidian 原生功能无缝集成
-- 支持 Obsidian 1.4.0 及以上版本
+- 支持 Obsidian 1.10.0 及以上版本
 
 ## 安装方法
 
@@ -105,7 +105,7 @@ Pretext Optimizer 是一个全自动的性能优化插件，启用后会自动�
 ### 工作原理
 
 - **Markdown 预览**: 插件会自动优化 Markdown 预览的渲染过程，减少 DOM 测量开销
-- **CodeMirror 编辑器**: 在 Obsidian 1.5+ 版本中，插件会优化 CodeMirror 编辑器的性能
+- **CodeMirror 编辑器**: 在 Obsidian 1.10+ 版本中，插件会优化 CodeMirror 编辑器的性能
 - **缓存机制**: 插件会缓存测量结果，避免重复计算，进一步提高性能
 
 ### 使用场景
@@ -148,7 +148,7 @@ Pretext Optimizer 是一个全自动的性能优化插件，启用后会自动�
    - 集成 Pretext 优化到 Obsidian 的渲染管道
 
 5. **CodeMirrorExtension**
-   - 为 Obsidian 1.5+ 版本提供 CodeMirror 编辑器优化
+   - 为 Obsidian 1.10+ 版本提供 CodeMirror 编辑器优化
    - 减少编辑器中的 DOM 测量开销
 
 ### 工作流程
@@ -175,7 +175,7 @@ Pretext Optimizer 是一个全自动的性能优化插件，启用后会自动�
 - **TypeScript**: 主要开发语言
 - **Obsidian API**: 与 Obsidian 集成
 - **Pretext**: DOM 测量优化库
-- **CodeMirror**: 编辑器优化（Obsidian 1.5+）
+- **CodeMirror**: 编辑器优化（Obsidian 1.10+）
 - **ESBuild**: 构建工具
 
 ### 项目结构
