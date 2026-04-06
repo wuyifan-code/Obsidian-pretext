@@ -67,8 +67,9 @@ export class PretextManager {
 		if (!this.loaded || !window.Pretext || !prepared) return null;
 
 		try {
-			// Check cache first
-			// We use a composite approach: Pretext's layout is cached by our MeasurementCache
+			// For caching, we need to extract text and font info from prepared text
+			// Since we don't have direct access to the internal structure of prepared text,
+			// we'll rely on Pretext's own caching and our MeasurementCache for broader scenarios
 			return window.Pretext.layout(prepared, maxWidth, lineHeight);
 		} catch (err) {
 			console.warn('[PretextManager] layout() failed:', err);
