@@ -70,7 +70,7 @@ export default class ObsidianPretextPlugin extends Plugin {
 			try {
 				// Dynamically import the extension to avoid errors in older Obsidian
 				import('./src/hooks/CodeMirrorExtension').then(({ createPretextCodeMirrorExtension }) => {
-					const extension = createPretextCodeMirrorExtension(this.pretextManager);
+					const extension = createPretextCodeMirrorExtension(this.pretextManager, this.measurementCache);
 					(this as any).registerCodeMirrorExtension(extension);
 					console.log('[Pretext Optimizer] CodeMirror extension registered.');
 				}).catch(err => {

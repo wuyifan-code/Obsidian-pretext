@@ -9,7 +9,7 @@ esbuild.build({
   entryPoints: ['main.ts'],
   bundle: true,
   outfile: 'main.js',
-  external: ['obsidian', '@codemirror/view'],
+  external: ['obsidian', '@codemirror/view', '@codemirror/state'],
   platform: 'browser',
   target: 'es2016',
   define: {
