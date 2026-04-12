@@ -5,7 +5,7 @@
 ## 基本信息
 
 - **插件名称**: Pretext Optimizer
-- **版本**: 1.1.0
+- **版本**: 1.2.0
 - **作者**: wuyifan-code 
 - **描述**: 集成 Pretext 库以减少 Obsidian 渲染管道中的 DOM 测量开销，提高大型文档的性能。
 
@@ -26,6 +26,7 @@
 - **无缝集成**: 无侵入性设计，与 Obsidian 原生功能完全兼容
 - **版本兼容**: 支持 Obsidian 1.10.0 及以上版本
 - **自动工作**: 启用后自动优化，无需手动配置
+- **模块化架构**: 代码结构清晰，易于维护和扩展
 
 ## 目录
 
@@ -53,6 +54,14 @@
 - 降低 CPU 使用率
 - 无侵入性设计，与 Obsidian 原生功能无缝集成
 - 支持 Obsidian 1.10.0 及以上版本
+
+### 代码质量改进 (v1.2.0)
+
+- **模块化重构**: 将原有的 analysis.js 拆分为多个专注模块
+- **正则表达式缓存**: 添加 RegexCache 缓存管理器，避免重复编译
+- **统一日志系统**: 添加 logger.ts 提供统一的日志和错误处理
+- **类型安全**: 所有新代码使用 TypeScript，添加完整的类型定义
+- **单元测试**: 添加 63 个单元测试，确保代码质量
 
 ## 安装方法
 
@@ -151,6 +160,15 @@ Pretext Optimizer 是一个全自动的性能优化插件，启用后会自动�
    - 为 Obsidian 1.10+ 版本提供 CodeMirror 编辑器优化
    - 减少编辑器中的 DOM 测量开销
 
+6. **分析模块 (v1.2.0 新增)**
+   - **WhitespaceModule**: 空白处理模块
+   - **PunctuationModule**: 标点处理模块
+   - **SegmentationModule**: 分词处理模块
+   - **RegexCache**: 正则表达式缓存管理器
+
+7. **工具模块 (v1.2.0 新增)**
+   - **Logger**: 统一日志和错误处理系统
+
 ### 工作流程
 
 1. **插件加载**
@@ -177,6 +195,7 @@ Pretext Optimizer 是一个全自动的性能优化插件，启用后会自动�
 - **Pretext**: DOM 测量优化库
 - **CodeMirror**: 编辑器优化（Obsidian 1.10+）
 - **ESBuild**: 构建工具
+- **Vitest**: 测试框架（v1.2.0 新增）
 
 ### 项目结构
 
@@ -185,17 +204,27 @@ obsidian-pretext/
 ├── lib/
 │   └── pretext/        # Pretext 库相关文件
 ├── src/
+│   ├── analysis/       # 分析模块（v1.2.0 新增）
+│   │   ├── whitespace.ts
+│   │   ├── punctuation.ts
+│   │   ├── segmentation.ts
+│   │   ├── RegexCache.ts
+│   │   └── index.ts
 │   ├── hooks/          # 各种扩展钩子
 │   │   ├── CodeMirrorExtension.ts
 │   │   └── MarkdownPostProcessor.ts
+│   ├── types/          # 类型定义（v1.2.0 新增）
+│   │   └── analysis.ts
 │   ├── utils/          # 工具函数
-│   │   └── FontMetrics.ts
+│   │   ├── FontMetrics.ts
+│   │   └── logger.ts   # 日志系统（v1.2.0 新增）
 │   ├── MeasurementCache.ts
 │   ├── PretextManager.ts
 │   └── pretextEntry.ts
 ├── main.ts             # 插件主文件
 ├── manifest.json       # 插件配置
 ├── package.json        # 项目配置
+├── vitest.config.ts    # 测试配置（v1.2.0 新增）
 └── README.md           # 本文档
 ```
 
@@ -224,11 +253,8 @@ obsidian-pretext/
 
 1. **构建插件**
    ```bash
-   # 构建 Pretext 库
-   node build-pretext.js
-   
    # 构建插件
-   node build.js
+   npm run build
    ```
 
 2. **开发模式**
@@ -238,17 +264,30 @@ obsidian-pretext/
 
 ### 🧪 测试
 
-项目包含以下测试文件：
+项目使用 **Vitest** 作为测试框架，包含以下测试文件：
 
-- `test-plugin.js`: 插件基本功能测试
-- `test-cache.js`: 缓存功能测试
-- `test-codemirror.js`: CodeMirror 扩展测试
-- `test-postprocessor.js`: Markdown 后处理器测试
-- `test-performance.js`: 性能测试
+```
+src/analysis/__tests__/
+├── whitespace.test.ts     # 空白处理模块测试
+├── punctuation.test.ts    # 标点处理模块测试
+├── RegexCache.test.ts     # 正则缓存模块测试
+└── segmentation.test.ts   # 分词模块测试
+```
 
 **运行测试**：
+
 ```bash
-node test-plugin.js
+# 运行所有测试
+npm test
+
+# 运行测试并观察变化
+npm run test:watch
+
+# 生成覆盖率报告
+npm run test:coverage
+
+# 类型检查
+npm run typecheck
 ```
 
 ## 贡献指南
@@ -295,6 +334,7 @@ node test-plugin.js
 - **为关键功能添加注释**，提高代码可读性
 - **确保代码可读性**，避免过于复杂的逻辑
 - **性能优先**，确保任何更改不会降低插件性能
+- **编写单元测试**，确保代码质量
 
 ### 📄 提交消息规范
 
@@ -333,7 +373,7 @@ node test-plugin.js
 ```
 ISC License
 
-Copyright (c) 2026, You
+Copyright (c) 2026, wuyifan-code
 
 Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted, provided that the above copyright notice and this permission notice appear in all copies.
 
