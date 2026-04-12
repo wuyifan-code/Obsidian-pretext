@@ -1,4 +1,4 @@
-interface FontInfo {
+export interface FontInfo {
 	fontFamily: string;
 	fontSize: number;
 	fontWeight: number;

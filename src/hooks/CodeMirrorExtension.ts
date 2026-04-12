@@ -1,221 +1,218 @@
 import { PretextManager } from '../PretextManager';
 import { MeasurementCache } from '../MeasurementCache';
 import { getFontInfoFromElement } from '../utils/FontMetrics';
+import { FontInfo } from '../utils/FontMetrics';
 
-// 类型声明
-type EditorView = any;
-type ViewPlugin = any;
-type DecorationSet = any;
-type RangeSetBuilder = any;
-type AnnotationType = any;
+// Use unknown instead of importing types that aren't available at compile time
+type IdleDeadlineObj = { timeRemaining: () => number; didTimeout?: boolean };
 
-// MeasureCompleteAnnotation 将在初始化时设置
-let MeasureCompleteAnnotation: AnnotationType; 
+// CodeMirror module references - initialized lazily at runtime
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let EditorViewClass: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let DecorationClass: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let RangeSetBuilderClass: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let MeasureCompleteAnnotation: any = null;
 
-// 类型补全，防止某些环境缺少 requestIdleCallback 的类型定义 
-type IdleDeadlineObj = { timeRemaining: () => number; didTimeout?: boolean }; 
+function getCodeMirrorModules(): boolean {
+	if (EditorViewClass && DecorationClass && RangeSetBuilderClass) {
+		return true;
+	}
 
-export function createPretextCodeMirrorExtension(pretextManager: PretextManager, cache: MeasurementCache) { 
-	 // 延迟获取 CodeMirror 模块，而不是在模块加载时
-	 const EditorView = (window as any).CodeMirror?.view?.EditorView;
-	 const Decoration = (window as any).CodeMirror?.view?.Decoration;
-	 const RangeSetBuilder = (window as any).CodeMirror?.state?.RangeSetBuilder;
-	 
-	 // 如果 CodeMirror 不可用，返回一个空扩展
-	 if (!EditorView || !Decoration || !RangeSetBuilder) {
-	 	 console.error('[Pretext Optimizer] CodeMirror not available');
-	 	 return EditorView?.plugin?.of(() => ({
-	 	 	 decorations: () => Decoration?.none || {}
-	 	 })) || {};
-	 }
-	 
-	 // 初始化 MeasureCompleteAnnotation
-	 MeasureCompleteAnnotation = (window as any).CodeMirror?.state?.Annotation?.define?.() || {};
-	 
-	 // 获取 ViewPlugin
-	 const ViewPlugin = (window as any).CodeMirror?.view?.ViewPlugin;
-	 if (!ViewPlugin) {
-	 	 console.error('[Pretext Optimizer] ViewPlugin not available');
-	 	 return {};
-	 }
-	 
-	 return ViewPlugin.fromClass(
-	 	 class { 
-	 	 	 private view: EditorView; 
-	 	 	 public decorations: DecorationSet; 
-	 	 	 
-	 	 	 // 异步计算状态管理 
-	 	 	 private pendingQueue: Set<string> = new Set(); 
-	 	 	 private idleCallbackId: number | null = null; 
-	 	 	 
-	 	 	 // 缓存的几何尺寸与字体信息，避免每帧重复读取 DOM 
-	 	 	 private fontInfo: any; 
-	 	 	 private contentWidth: number = 0; 
+	// Access Obsidian's internal CodeMirror via window
+	// Obsidian 1.5+ bundles CodeMirror 6 internally
+	const win = window as any;
+	const cm = win.CodeMirror;
+	if (cm?.view?.EditorView && cm?.view?.Decoration && cm?.state?.RangeSetBuilder) {
+		EditorViewClass = cm.view.EditorView;
+		DecorationClass = cm.view.Decoration;
+		RangeSetBuilderClass = cm.state.RangeSetBuilder;
+		MeasureCompleteAnnotation = cm.state.Annotation?.define?.() || null;
+		return true;
+	}
 
-	 	 	 constructor(view: EditorView) { 
-	 	 	 	 this.view = view; 
-	 	 	 	 this.updateMetrics(); 
-	 	 	 	 this.decorations = this.buildDecorations(view); 
-	 	 	 } 
+	return false;
+}
 
-	 	 	 // P1.2 & P1.3 修复：专门处理几何属性的更新 
-	 	 	 private updateMetrics() { 
-	 	 	 	 if (this.view.contentDOM) { 
-	 	 	 	 	 this.fontInfo = getFontInfoFromElement(this.view.contentDOM as HTMLElement); 
-	 	 	 	 	 // 使用 scrollDOM 的宽度比 contentDOM 更可靠，减去大概的安全 Padding 
-	 	 	 	 	 const scrollWidth = this.view.scrollDOM.clientWidth; 
-	 	 	 	 	 this.contentWidth = scrollWidth ? scrollWidth - 10 : 700; // 减去预估的内边距，防溢出 
-	 	 	 	 } 
-	 	 	 } 
+export function createPretextCodeMirrorExtension(pretextManager: PretextManager, cache: MeasurementCache) {
+	// If CodeMirror modules are not available, return a no-op extension
+	if (!getCodeMirrorModules() || !EditorViewClass || !DecorationClass || !RangeSetBuilderClass) {
+		console.error('[Pretext Optimizer] CodeMirror not available');
+		// Return a minimal extension that does nothing
+		return EditorViewClass?.plugin?.define
+			? EditorViewClass.plugin.define(
+					class {
+						decorations = DecorationClass?.none ?? { map: () => this.decorations };
+					},
+					{ decorations: (v: any) => v.decorations }
+			  )
+			: {};
+	}
 
-	 	 	 update(update: ViewUpdate) { 
-	 	 	 	 if (!pretextManager.isReady()) return; 
+	return EditorViewClass.plugin.define(
+		class {
+			view: any;
+			decorations: any;
+			private pendingQueue: Set<string> = new Set();
+			private idleCallbackId: number | null = null;
+			private fontInfo: FontInfo | null = null;
+			private contentWidth: number = 0;
 
-	 	 	 	 let needsRebuild = false; 
+			constructor(view: any) {
+				this.view = view;
+				this.updateMetrics();
+				this.decorations = this.buildDecorations(view);
+			}
 
-	 	 	 	 // P0.3 & P1.2 修复：精准控制何时需要重建装饰器 
-	 	 	 	 if (update.geometryChanged) { 
-	 	 	 	 	 this.updateMetrics(); 
-	 	 	 	 	 needsRebuild = true; 
-	 	 	 	 } 
+			update(view: any): void {
+				if (!pretextManager.isReady()) return;
 
-	 	 	 	 // 文档改变、视口改变、或者我们的异步测量任务汇报了“完成” 
-	 	 	 	 if ( 
-	 	 	 	 	 update.docChanged || 
-	 	 	 	 	 update.viewportChanged || 
-	 	 	 	 	 update.transactions.some(tr => tr.annotation(MeasureCompleteAnnotation)) 
-	 	 	 	 ) { 
-	 	 	 	 	 needsRebuild = true; 
-	 	 	 	 } 
+				let needsRebuild = false;
 
-	 	 	 	 if (needsRebuild) { 
-	 	 	 	 	 this.decorations = this.buildDecorations(update.view); 
-	 	 	 	 } 
-	 	 	 } 
+				if (view.geometryChanged) {
+					this.updateMetrics();
+					needsRebuild = true;
+				}
 
-	 	 	 private buildDecorations(view: EditorView): DecorationSet { 
-	 	 	 	 const builder = new RangeSetBuilder<Decoration>(); 
-	 	 	 	 const { from, to } = view.viewport; 
+				if (
+					view.docChanged ||
+					view.viewportChanged ||
+					(view.transactions?.some?.((tr: any) => tr.annotation(MeasureCompleteAnnotation)))
+				) {
+					needsRebuild = true;
+				}
 
-	 	 	 	 if (to <= from || !this.fontInfo) return Decoration.none; 
+				if (needsRebuild) {
+					this.decorations = this.buildDecorations(view);
+				}
+			}
 
-	 	 	 	 const lineHeightUnit = this.fontInfo.lineHeight / this.fontInfo.fontSize; 
-	 	 	 	 let hasNewPending = false; 
+			private updateMetrics(): void {
+				if (this.view.contentDOM) {
+					this.fontInfo = getFontInfoFromElement(this.view.contentDOM as HTMLElement);
+					const scrollWidth = this.view.scrollDOM.clientWidth;
+					this.contentWidth = scrollWidth ? scrollWidth - 10 : 700;
+				}
+			}
 
-	 	 	 	 // 遍历当前视口可见行 
-	 	 	 	 for (let pos = from; pos <= to; ) { 
-	 	 	 	 	 const line = view.state.doc.lineAt(pos); 
-	 	 	 	 	 const text = line.text; 
+			private buildDecorations(view: any): any {
+				const builder = new RangeSetBuilderClass();
+				const { from, to } = view.viewport;
 
-	 	 	 	 	 if (text.trim() && text.length > 50) { 
-	 	 	 	 	 	 // P0.2 修复：首先且优先检查缓存，这里是绝对的 O(1) 速度，毫秒级以下 
-	 	 	 	 	 	 const cached = cache.get( 
-	 	 	 	 	 	 	 text, 
-	 	 	 	 	 	 	 this.fontInfo.fontFamily, 
-	 	 	 	 	 	 	 this.fontInfo.fontSize, 
-	 	 	 	 	 	 	 this.fontInfo.fontWeight, 
-	 	 	 	 	 	 	 this.contentWidth, 
-	 	 	 	 	 	 	 lineHeightUnit 
-	 	 	 	 	 	 ); 
+				if (to <= from || !this.fontInfo) return DecorationClass.none;
 
-	 	 	 	 	 	 if (cached) { 
-	 	 	 	 	 	 	 // 命中缓存，直接应用高度装饰器 
-	 	 	 	 	 	 	 const lineDeco = Decoration.line({ 
-	 	 	 	 	 	 	 	 attributes: { 
-	 	 	 	 	 	 	 	 	 style: `min-height: ${cached.height}px;`, 
-	 	 	 	 	 	 	 	 	 'data-pretext-cm': 'true' // 加个标记方便调试和规避冲突 
-	 	 	 	 	 	 	 	 } 
-	 	 	 	 	 	 	 }); 
-	 	 	 	 	 	 	 builder.add(line.from, line.from, lineDeco); 
-	 	 	 	 	 	 } else { 
-	 	 	 	 	 	 	 // 未命中缓存，不阻塞主线程，加入待处理队列 
-	 	 	 	 	 	 	 if (!this.pendingQueue.has(text)) { 
-	 	 	 	 	 	 	 	 this.pendingQueue.add(text); 
-	 	 	 	 	 	 	 	 hasNewPending = true; 
-	 	 	 	 	 	 	 } 
-	 	 	 	 	 	 } 
-	 	 	 	 	 } 
-	 	 	 	 	 pos = line.to + 1; 
-	 	 	 	 } 
+				const lineHeightUnit = this.fontInfo.lineHeight / this.fontInfo.fontSize;
+				let hasNewPending = false;
 
-	 	 	 	 // 如果发现了需要测量的新行，调度空闲回调 
-	 	 	 	 if (hasNewPending) { 
-	 	 	 	 	 this.scheduleMeasurement(); 
-	 	 	 	 } 
+				for (let pos = from; pos <= to; ) {
+					const line = view.state.doc.lineAt(pos);
+					const text = line.text;
 
-	 	 	 	 return builder.finish(); 
-	 	 	 } 
+					if (text.trim() && text.length > 50) {
+						const cached = cache.get(
+							text,
+							this.fontInfo.fontFamily,
+							this.fontInfo.fontSize,
+							this.fontInfo.fontWeight,
+							this.contentWidth,
+							lineHeightUnit
+						);
 
-	 	 	 // P0.1 修复：将昂贵的测量放入浏览器的空闲时间 (Idle Time) 
-	 	 	 private scheduleMeasurement() { 
-	 	 	 	 if (this.idleCallbackId !== null) return; 
+						if (cached) {
+							const lineDeco = DecorationClass.line({
+								attributes: {
+									style: `min-height: ${cached.height}px;`,
+									'data-pretext-cm': 'true',
+								},
+							});
+							builder.add(line.from, line.from, lineDeco);
+						} else {
+							if (!this.pendingQueue.has(text)) {
+								this.pendingQueue.add(text);
+								hasNewPending = true;
+							}
+						}
+					}
+					pos = line.to + 1;
+				}
 
-	 	 	 	 const schedule = window.requestIdleCallback || ((cb: Function) => setTimeout(() => cb({ timeRemaining: () => 10 }), 1)); 
-	 	 	 	 
-	 	 	 	 this.idleCallbackId = schedule((deadline: IdleDeadlineObj) => { 
-	 	 	 	 	 this.idleCallbackId = null; 
-	 	 	 	 	 this.processQueue(deadline); 
-	 	 	 	 }); 
-	 	 	 } 
+				if (hasNewPending) {
+					this.scheduleMeasurement();
+				}
 
-	 	 	 private processQueue(deadline: IdleDeadlineObj) { 
-	 	 	 	 if (this.pendingQueue.size === 0 || !pretextManager.isReady()) return; 
+				return builder.finish();
+			}
 
-	 	 	 	 const lineHeightUnit = this.fontInfo.lineHeight / this.fontInfo.fontSize; 
-	 	 	 	 let processedCount = 0; 
-	 	 	 	 const iterator = this.pendingQueue.values(); 
-	 	 	 	 let next = iterator.next(); 
+			private scheduleMeasurement(): void {
+				if (this.idleCallbackId !== null) return;
 
-	 	 	 	 // 当队列没空，且这一帧还有超过 2 毫秒的空闲时间时，继续猛算 
-	 	 	 	 while (!next.done && deadline.timeRemaining() > 2) { 
-	 	 	 	 	 const text = next.value; 
-	 	 	 	 	 this.pendingQueue.delete(text); // 移出队列 
+				const schedule =
+					typeof window !== 'undefined' && (window as any).requestIdleCallback
+						? (window as any).requestIdleCallback
+						: ((cb: (deadline: IdleDeadlineObj) => void) => setTimeout(() => cb({ timeRemaining: () => 10 }), 50));
 
-	 	 	 	 	 // 执行沉重的 Pretext Phase 1 & 2 
-	 	 	 	 	 const prepared = pretextManager.prepare(text, this.fontInfo); 
-	 	 	 	 	 if (prepared) { 
-	 	 	 	 	 	 const layoutResult = pretextManager.layout(prepared, this.contentWidth, lineHeightUnit); 
-	 	 	 	 	 	 if (layoutResult) { 
-	 	 	 	 	 	 	 // 算完立刻塞进缓存 
-	 	 	 	 	 	 	 cache.set( 
-	 	 	 	 	 	 	 	 text, 
-	 	 	 	 	 	 	 	 this.fontInfo.fontFamily, 
-	 	 	 	 	 	 	 	 this.fontInfo.fontSize, 
-	 	 	 	 	 	 	 	 this.fontInfo.fontWeight, 
-	 	 	 	 	 	 	 	 this.contentWidth, 
-	 	 	 	 	 	 	 	 lineHeightUnit, 
-	 	 	 	 	 	 	 	 layoutResult 
-	 	 	 	 	 	 	 ); 
-	 	 	 	 	 	 	 processedCount++; 
-	 	 	 	 	 	 } 
-	 	 	 	 	 } 
-	 	 	 	 	 next = iterator.next(); 
-	 	 	 	 } 
+				this.idleCallbackId = schedule((deadline: IdleDeadlineObj) => {
+					this.idleCallbackId = null;
+					this.processQueue(deadline);
+				});
+			}
 
-	 	 	 	 // 如果这波计算有产出，发起一个柔和的视图 Dispatch，通知 CM6 去更新 DOM 
-	 	 	 	 if (processedCount > 0 && !this.view.isDestroyed) { 
-	 	 	 	 	 this.view.dispatch({ 
-	 	 	 	 	 	 annotations: MeasureCompleteAnnotation.of(true) 
-	 	 	 	 	 }); 
-	 	 	 	 } 
+			private processQueue(deadline: IdleDeadlineObj): void {
+				if (this.pendingQueue.size === 0 || !pretextManager.isReady()) return;
 
-	 	 	 	 // 如果没算完，说明这一帧时间用光了，把剩下的排进下一帧空闲时段 
-	 	 	 	 if (this.pendingQueue.size > 0) { 
-	 	 	 	 	 this.scheduleMeasurement(); 
-	 	 	 	 } 
-	 	 	 } 
+				const lineHeightUnit = this.fontInfo!.lineHeight / this.fontInfo!.fontSize;
+				let processedCount = 0;
+				const items = Array.from(this.pendingQueue);
 
-	 	 	 destroy() { 
-	 	 	 	 // 清理任务 
-	 	 	 	 if (this.idleCallbackId !== null) { 
-	 	 	 	 	 const cancel = window.cancelIdleCallback || clearTimeout; 
-	 	 	 	 	 cancel(this.idleCallbackId); 
-	 	 	 	 } 
-	 	 	 	 this.pendingQueue.clear(); 
-	 	 	 } 
-	 	 }, 
-	 	 { 
-	 	 	 decorations: v => v.decorations 
-	 	 } 
-	 ); 
+				for (const text of items) {
+					if (deadline.timeRemaining() <= 2) break;
+
+					this.pendingQueue.delete(text);
+
+					const prepared = pretextManager.prepare(text, this.fontInfo!);
+					if (prepared) {
+						const layoutResult = pretextManager.layout(prepared, this.contentWidth, lineHeightUnit);
+						if (layoutResult) {
+							cache.set(
+								text,
+								this.fontInfo!.fontFamily,
+								this.fontInfo!.fontSize,
+								this.fontInfo!.fontWeight,
+								this.contentWidth,
+								lineHeightUnit,
+								layoutResult
+							);
+							processedCount++;
+						}
+					}
+				}
+
+				if (processedCount > 0 && !this.view.isDestroyed) {
+					this.view.dispatch({
+						annotations: MeasureCompleteAnnotation?.of(true),
+					});
+				}
+
+				if (this.pendingQueue.size > 0) {
+					this.scheduleMeasurement();
+				}
+			}
+
+			destroy(): void {
+				if (this.idleCallbackId !== null) {
+					const cancel =
+						typeof window !== 'undefined' && (window as any).cancelIdleCallback
+							? (window as any).cancelIdleCallback
+							: clearTimeout;
+					cancel(this.idleCallbackId);
+				}
+				this.pendingQueue.clear();
+			}
+		},
+		{
+			decorations: (v: any) => v.decorations,
+		}
+	);
 }

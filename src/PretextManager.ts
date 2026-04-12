@@ -1,4 +1,5 @@
 import { MeasurementCache } from './MeasurementCache';
+import { FontInfo } from './utils/FontMetrics';
 
 // Pretext type definitions (matching @chenglou/pretext API)
 type PreparedText = unknown;
@@ -6,13 +7,6 @@ type LayoutResult = { height: number; lineCount: number };
 type LayoutLinesResult = LayoutResult & {
 	lines: Array<{ text: string; width: number; start: { segmentIndex: number; graphemeIndex: number }; end: { segmentIndex: number; graphemeIndex: number } }>;
 };
-
-interface FontInfo {
-	fontFamily: string;
-	fontSize: number;
-	fontWeight: number;
-	lineHeight: number;
-}
 
 declare global {
 	interface Window {
@@ -36,18 +30,26 @@ export class PretextManager {
 		this.cache = cache;
 	}
 
-	async initialize(): Promise<void> {
+	async initialize(): Promise<boolean> {
 		// Pretext bundle is loaded via styles.css injection
-		// Wait a tick for the script to execute
-		await new Promise((resolve) => setTimeout(resolve, 0));
+		// Wait for the script to execute - use polling with timeout
+		const maxWait = 5000;
+		const checkInterval = 50;
+		const startTime = Date.now();
+
+		while (!window.Pretext && Date.now() - startTime < maxWait) {
+			await new Promise((resolve) => setTimeout(resolve, checkInterval));
+		}
 
 		if (window.Pretext) {
 			this.loaded = true;
 			console.log('[PretextManager] Pretext library loaded successfully.');
-		} else {
-			this.loadFailed = true;
-			console.warn('[PretextManager] Pretext not available, performance may not improve.');
+			return true;
 		}
+
+		this.loadFailed = true;
+		console.warn('[PretextManager] Pretext not available, performance may not improve.');
+		return false;
 	}
 
 	prepare(text: string, font: FontInfo): PreparedText | null {
@@ -57,7 +59,7 @@ export class PretextManager {
 			return window.Pretext.prepare(text, font.fontFamily, {
 				whiteSpace: 'normal',
 			});
-		} catch (err) {
+		} catch (err: unknown) {
 			console.warn('[PretextManager] prepare() failed:', err);
 			return null;
 		}
@@ -71,7 +73,7 @@ export class PretextManager {
 			// Since we don't have direct access to the internal structure of prepared text,
 			// we'll rely on Pretext's own caching and our MeasurementCache for broader scenarios
 			return window.Pretext.layout(prepared, maxWidth, lineHeight);
-		} catch (err) {
+		} catch (err: unknown) {
 			console.warn('[PretextManager] layout() failed:', err);
 			return null;
 		}
@@ -82,7 +84,7 @@ export class PretextManager {
 
 		try {
 			return window.Pretext.layoutWithLines(prepared, maxWidth, lineHeight);
-		} catch (err) {
+		} catch (err: unknown) {
 			console.warn('[PretextManager] layoutWithLines() failed:', err);
 			return null;
 		}
@@ -97,7 +99,7 @@ export class PretextManager {
 
 		try {
 			window.Pretext.walkLineRanges(prepared, maxWidth, onLine);
-		} catch (err) {
+		} catch (err: unknown) {
 			console.warn('[PretextManager] walkLineRanges() failed:', err);
 		}
 	}

@@ -12,6 +12,7 @@ export default class ObsidianPretextPlugin extends Plugin {
 	private pretextManager!: PretextManager;
 	private measurementCache!: MeasurementCache;
 	private resizeObserver!: ResizeObserver;
+	private processingFlag = false;
 
 	async onload() {
 		console.log('[Pretext Optimizer] Loading plugin...');
@@ -87,6 +88,8 @@ export default class ObsidianPretextPlugin extends Plugin {
 		}
 
 		this.resizeObserver = new ResizeObserver((entries) => {
+			// Prevent feedback loop with MutationObserver
+			this.processingFlag = true;
 			entries.forEach((entry) => {
 				const el = entry.target as HTMLElement;
 				const currentWidth = entry.contentRect.width;
@@ -97,6 +100,8 @@ export default class ObsidianPretextPlugin extends Plugin {
 					processHeavyElement(el, this.pretextManager, this.measurementCache, currentWidth);
 				}
 			});
+			// Reset flag after processing
+			this.processingFlag = false;
 		});
 
 		// Start observing heavy elements
@@ -104,12 +109,18 @@ export default class ObsidianPretextPlugin extends Plugin {
 
 		// Register a callback to observe new elements when DOM changes
 		const observer = new MutationObserver(() => {
+			// Skip if ResizeObserver is processing to prevent feedback loop
+			if (this.processingFlag) {
+				return;
+			}
 			this.observeHeavyElements();
 		});
 
+		// Observe only direct children of body to reduce scope
+		// Elements must be added via MarkdownPostProcessor or direct DOM insertion
 		observer.observe(document.body, {
 			childList: true,
-			subtree: true,
+			subtree: false,
 		});
 
 		// Clean up observer on unload
@@ -125,8 +136,13 @@ export default class ObsidianPretextPlugin extends Plugin {
 		for (const selector of HEAVY_SELECTORS) {
 			const elements = document.querySelectorAll<HTMLElement>(selector);
 			elements.forEach((el) => {
-				// Only observe elements that have been optimized
-				if (el.hasAttribute('data-pretext-optimized')) {
+				// Observe elements that need optimization (not yet optimized or width changed)
+				// We observe ALL matching elements, not just optimized ones, to catch new elements
+				const currentWidth = el.clientWidth;
+				const previousWidth = parseFloat(el.getAttribute('data-pretext-width') || '0');
+
+				if (!el.hasAttribute('data-pretext-optimized') ||
+					Math.abs(currentWidth - previousWidth) > 10) {
 					this.resizeObserver.observe(el);
 				}
 			});

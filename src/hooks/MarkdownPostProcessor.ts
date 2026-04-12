@@ -4,7 +4,7 @@ import { MeasurementCache } from '../MeasurementCache';
 import { HEAVY_SELECTORS, processHeavyElement } from './HeavyElementOptimizer';
 
 export function createMarkdownPostProcessor(pretextManager: PretextManager, cache: MeasurementCache): MarkdownPostProcessor {
-	return (element: HTMLElement, context: { sourcePath: string }) => {
+	return (element: HTMLElement, context: { _sourcePath: string }) => {
 		if (!pretextManager.isReady()) {
 			return;
 		}
