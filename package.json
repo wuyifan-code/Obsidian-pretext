@@ -1,19 +1,31 @@
 {
   "name": "obsidian-pretext",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "1.2.0",
+  "description": "Integrates Pretext library to reduce DOM measurement overhead in Obsidian's rendering pipeline",
+  "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "node build.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "obsidian",
+    "pretext",
+    "performance",
+    "markdown"
+  ],
+  "author": "wuyifan-code",
+  "license": "MIT",
   "type": "commonjs",
   "devDependencies": {
     "@types/css": "^0.0.38",
     "@types/node": "^25.5.0",
+    "@vitest/coverage-v8": "^2.0.0",
     "esbuild": "^0.27.4",
-    "typescript": "^6.0.2"
+    "jsdom": "^29.0.2",
+    "typescript": "^6.0.2",
+    "vitest": "^2.0.0"
   }
 }
