@@ -92,18 +92,40 @@
 4. 点击 "安装" 按钮
 5. 点击 "启用" 按钮
 
-### Beta 插件安装
+### Beta 插件安装（使用 BRAT）
 
-如果插件处于 Beta 阶段，您可以通过以下步骤安装：
+如果插件处于 Beta 阶段，您需要使用 **BRAT**（Beta Reviewers Auto-update Tester）插件来安装：
 
-1. 打开 Obsidian
-2. 进入设置 → 插件 → 社区插件
-3. 关闭 "安全模式"
-4. 点击 "浏览" 按钮
-5. 在搜索框中输入插件的 GitHub 仓库地址：`wuyifan-code/Obsidian-pretext`
-6. 点击搜索结果中的插件
-7. 点击 "安装" 按钮
-8. 点击 "启用" 按钮
+#### 步骤 1：安装 BRAT 插件
+1. 打开 Obsidian → **设置** → **社区插件**
+2. 关闭 "安全模式"
+3. 点击 "浏览" 按钮
+4. 搜索 **"BRAT"**，找到 **"Obsidian 42 - BRAT"**
+5. 点击 "安装" → "启用"
+
+#### 步骤 2：添加 Beta 插件
+1. 打开命令面板 (`Ctrl/Cmd + P`)
+2. 输入 **"BRAT: Add a beta plugin for testing"**
+3. 输入插件的 GitHub 仓库地址（支持两种格式）：
+   - 完整 URL：`https://github.com/wuyifan-code/Obsidian-pretext`
+   - 简洁格式：`wuyifan-code/Obsidian-pretext`
+4. 点击 "Add Plugin"
+
+#### 步骤 3：启用插件
+1. 进入 **设置** → **社区插件**
+2. 在已安装插件列表中找到 "Pretext Optimizer"
+3. 开启开关启用插件
+
+#### 更新 Beta 版本
+- **自动更新**：BRAT 会定期检查并自动更新 Beta 版本
+- **手动更新**：打开命令面板 → 输入 "BRAT: Check for updates"
+
+#### 手动安装（备选方案）
+如果您不想使用 BRAT，可以手动安装：
+1. 访问 GitHub 仓库的 **Releases** 页面
+2. 下载最新的 beta 版本压缩包
+3. 解压到 `.obsidian/plugins/obsidian-pretext/`
+4. 重启 Obsidian 并在设置中启用插件
 
 ## 使用说明
 
