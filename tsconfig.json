@@ -12,6 +12,6 @@
 		"sourceMap": false,
 		"lib": ["ES2022", "DOM"]
 	},
-	"include": ["src/**/*.ts", "main.ts"],
+	"include": ["src/**/*.ts", "main.ts", "src/types/**/*.ts"],
 	"exclude": ["node_modules"]
 }

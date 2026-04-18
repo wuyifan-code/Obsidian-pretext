@@ -34,7 +34,7 @@ export function processHeavyElement(el: HTMLElement, pretextManager: PretextMana
 	const lineHeightUnit = font.lineHeight / font.fontSize;
 
 	// Check cache first
-	const cached = cache.get(
+	const cacheKey = cache.getCacheKey(
 		text,
 		font.fontFamily,
 		font.fontSize,
@@ -42,6 +42,8 @@ export function processHeavyElement(el: HTMLElement, pretextManager: PretextMana
 		maxWidth,
 		lineHeightUnit
 	);
+
+	const cached = cache.get(cacheKey);
 
 	if (cached) {
 		el.style.minHeight = `${cached.height}px`;
@@ -62,15 +64,7 @@ export function processHeavyElement(el: HTMLElement, pretextManager: PretextMana
 	}
 
 	// Cache the result
-	cache.set(
-		text,
-		font.fontFamily,
-		font.fontSize,
-		font.fontWeight,
-		maxWidth,
-		lineHeightUnit,
-		layout
-	);
+	cache.set(cacheKey, layout);
 
 	// Apply optimized height to prevent reflow
 	el.style.minHeight = `${layout.height}px`;

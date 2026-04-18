@@ -1,0 +1,1 @@
+declare module '../lib/pretext/layout.js' { export const prepare: any; export const prepareWithSegments: any; export const layout: any; export const layoutWithLines: any; export const walkLineRanges: any; export const layoutNextLine: any; export const clearCache: any; export const setLocale: any; export const profilePrepare: any; }

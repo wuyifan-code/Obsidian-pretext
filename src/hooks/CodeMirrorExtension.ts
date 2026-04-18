@@ -2,6 +2,7 @@ import { PretextManager } from '../PretextManager';
 import { MeasurementCache } from '../MeasurementCache';
 import { getFontInfoFromElement } from '../utils/FontMetrics';
 import { FontInfo } from '../utils/FontMetrics';
+import { logger } from '../utils/logger';
 
 // Use unknown instead of importing types that aren't available at compile time
 type IdleDeadlineObj = { timeRemaining: () => number; didTimeout?: boolean };
@@ -39,7 +40,7 @@ function getCodeMirrorModules(): boolean {
 export function createPretextCodeMirrorExtension(pretextManager: PretextManager, cache: MeasurementCache) {
 	// If CodeMirror modules are not available, return a no-op extension
 	if (!getCodeMirrorModules() || !EditorViewClass || !DecorationClass || !RangeSetBuilderClass) {
-		console.error('[Pretext Optimizer] CodeMirror not available');
+		logger.error('CodeMirror not available');
 		// Return a minimal extension that does nothing
 		return EditorViewClass?.plugin?.define
 			? EditorViewClass.plugin.define(
@@ -111,7 +112,7 @@ export function createPretextCodeMirrorExtension(pretextManager: PretextManager,
 					const text = line.text;
 
 					if (text.trim() && text.length > 50) {
-						const cached = cache.get(
+						const cacheKey = cache.getCacheKey(
 							text,
 							this.fontInfo.fontFamily,
 							this.fontInfo.fontSize,
@@ -119,6 +120,7 @@ export function createPretextCodeMirrorExtension(pretextManager: PretextManager,
 							this.contentWidth,
 							lineHeightUnit
 						);
+						const cached = cache.get(cacheKey);
 
 						if (cached) {
 							const lineDeco = DecorationClass.line({
@@ -164,9 +166,8 @@ export function createPretextCodeMirrorExtension(pretextManager: PretextManager,
 
 				const lineHeightUnit = this.fontInfo!.lineHeight / this.fontInfo!.fontSize;
 				let processedCount = 0;
-				const items = Array.from(this.pendingQueue);
 
-				for (const text of items) {
+				for (const text of this.pendingQueue) {
 					if (deadline.timeRemaining() <= 2) break;
 
 					this.pendingQueue.delete(text);
@@ -175,15 +176,15 @@ export function createPretextCodeMirrorExtension(pretextManager: PretextManager,
 					if (prepared) {
 						const layoutResult = pretextManager.layout(prepared, this.contentWidth, lineHeightUnit);
 						if (layoutResult) {
-							cache.set(
+							const cacheKey = cache.getCacheKey(
 								text,
 								this.fontInfo!.fontFamily,
 								this.fontInfo!.fontSize,
 								this.fontInfo!.fontWeight,
 								this.contentWidth,
-								lineHeightUnit,
-								layoutResult
+								lineHeightUnit
 							);
+							cache.set(cacheKey, layoutResult);
 							processedCount++;
 						}
 					}

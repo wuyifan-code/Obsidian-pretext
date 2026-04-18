@@ -33,15 +33,28 @@ type LayoutResult = { height: number; lineCount: number };
  	 	 return `${textHash}:${fontFamily}:${fontSize}:${fontWeight}:${maxWidth}:${lineHeight}`;
  	 }
 
- 	 get(
+	 getCacheKey(
  	 	 text: string,
  	 	 fontFamily: string,
  	 	 fontSize: number,
  	 	 fontWeight: number,
  	 	 maxWidth: number,
  	 	 lineHeight: number
+	 ): string {
+		 return this.makeKey(text, fontFamily, fontSize, fontWeight, maxWidth, lineHeight);
+	 }
+
+	 get(
+		 textOrKey: string,
+		 fontFamily?: string,
+		 fontSize?: number,
+		 fontWeight?: number,
+		 maxWidth?: number,
+		 lineHeight?: number
  	 ): LayoutResult | null {
- 	 	 const key = this.makeKey(text, fontFamily, fontSize, fontWeight, maxWidth, lineHeight);
+		 const key = (fontFamily !== undefined && fontSize !== undefined && fontWeight !== undefined && maxWidth !== undefined && lineHeight !== undefined)
+			 ? this.makeKey(textOrKey, fontFamily, fontSize, fontWeight, maxWidth, lineHeight)
+			 : textOrKey;
  	 	 const entry = this.cache.get(key);
 
  	 	 if (entry) {
@@ -55,15 +68,24 @@ type LayoutResult = { height: number; lineCount: number };
  	 }
 
  	 set(
- 	 	 text: string,
- 	 	 fontFamily: string,
- 	 	 fontSize: number,
- 	 	 fontWeight: number,
- 	 	 maxWidth: number,
- 	 	 lineHeight: number,
- 	 	 value: LayoutResult
+		 textOrKey: string,
+		 fontFamilyOrValue: string | LayoutResult,
+		 fontSize?: number,
+		 fontWeight?: number,
+		 maxWidth?: number,
+		 lineHeight?: number,
+		 value?: LayoutResult
  	 ): void {
- 	 	 const key = this.makeKey(text, fontFamily, fontSize, fontWeight, maxWidth, lineHeight);
+		 let key: string;
+		 let val: LayoutResult;
+
+		 if (typeof fontFamilyOrValue === 'string' && fontSize !== undefined && fontWeight !== undefined && maxWidth !== undefined && lineHeight !== undefined && value !== undefined) {
+			 key = this.makeKey(textOrKey, fontFamilyOrValue, fontSize, fontWeight, maxWidth, lineHeight);
+			 val = value;
+		 } else {
+			 key = textOrKey;
+			 val = fontFamilyOrValue as LayoutResult;
+		 }
 
  	 	 // 如果 key 已存在，先删除再添加以更新顺序，移到最新位置
  	 	 if (this.cache.has(key)) {
@@ -72,7 +94,7 @@ type LayoutResult = { height: number; lineCount: number };
  	 	 	 this.evictOldest();
  	 	 }
 
- 	 	 this.cache.set(key, { value });
+		 this.cache.set(key, { value: val });
  	 }
 
  	 private evictOldest(): void {
