@@ -4,6 +4,7 @@ import { MeasurementCache } from './src/MeasurementCache';
 import { createMarkdownPostProcessor } from './src/hooks/MarkdownPostProcessor';
 import { HEAVY_SELECTORS, processHeavyElement } from './src/hooks/HeavyElementOptimizer';
 import { createPretextCodeMirrorExtension } from './src/hooks/CodeMirrorExtension';
+import { logger } from './src/utils/logger';
 
 // Pretext bundle is injected at build time
 declare const INJECT_PRETEXT_BUNDLE: string;
@@ -15,7 +16,7 @@ export default class ObsidianPretextPlugin extends Plugin {
 	private processingFlag = false;
 
 	async onload() {
-		console.log('[Pretext Optimizer] Loading plugin...');
+		logger.info('Loading plugin...');
 
 		// Load Pretext bundle (injected at build time)
 		this.loadPretextBundle();
@@ -26,7 +27,7 @@ export default class ObsidianPretextPlugin extends Plugin {
 		await this.pretextManager.initialize();
 
 		if (!this.pretextManager.isReady()) {
-			console.warn('[Pretext Optimizer] Pretext not available. Plugin will not provide optimization.');
+			logger.warn('Pretext not available. Plugin will not provide optimization.');
 		}
 
 		// Register Markdown post-processor for live preview optimization
@@ -41,12 +42,12 @@ export default class ObsidianPretextPlugin extends Plugin {
 		// Initialize ResizeObserver for heavy elements
 		this.initializeResizeObserver();
 
-		console.log('[Pretext Optimizer] Plugin loaded successfully.');
+		logger.info('Plugin loaded successfully.');
 	}
 
 	private loadPretextBundle(): void {
 		if ((window as any).Pretext) {
-			console.log('[Pretext Optimizer] Pretext already available.');
+			logger.info('Pretext already available.');
 			return;
 		}
 
@@ -56,12 +57,12 @@ export default class ObsidianPretextPlugin extends Plugin {
 			document.head.appendChild(script);
 
 			if ((window as any).Pretext) {
-				console.log('[Pretext Optimizer] Pretext bundle loaded successfully.');
+				logger.info('Pretext bundle loaded successfully.');
 			} else {
-				console.error('[Pretext Optimizer] Pretext not defined after script execution.');
+				logger.error('Pretext not defined after script execution.');
 			}
 		} catch (err) {
-			console.error('[Pretext Optimizer] Failed to load Pretext bundle:', err);
+			logger.error('Failed to load Pretext bundle:', err);
 		}
 	}
 
@@ -73,12 +74,12 @@ export default class ObsidianPretextPlugin extends Plugin {
 				// Use static import to ensure dependencies are properly initialized
 				const extension = createPretextCodeMirrorExtension(this.pretextManager, this.measurementCache);
 				(this as any).registerCodeMirrorExtension(extension);
-				console.log('[Pretext Optimizer] CodeMirror extension registered.');
+				logger.info('CodeMirror extension registered.');
 			} catch (err) {
-				console.warn('[Pretext Optimizer] CodeMirror extension not available:', err);
+				logger.warn('CodeMirror extension not available:', err);
 			}
 		} else {
-			console.log('[Pretext Optimizer] CodeMirror extension not supported in this Obsidian version (requires 1.5+).');
+			logger.info('CodeMirror extension not supported in this Obsidian version (requires 1.5+).');
 		}
 	}
 
@@ -133,24 +134,23 @@ export default class ObsidianPretextPlugin extends Plugin {
 		}
 
 		// Find and observe heavy elements
-		for (const selector of HEAVY_SELECTORS) {
-			const elements = document.querySelectorAll<HTMLElement>(selector);
-			elements.forEach((el) => {
-				// Observe elements that need optimization (not yet optimized or width changed)
-				// We observe ALL matching elements, not just optimized ones, to catch new elements
-				const currentWidth = el.clientWidth;
-				const previousWidth = parseFloat(el.getAttribute('data-pretext-width') || '0');
+		const combinedSelector = HEAVY_SELECTORS.join(', ');
+		const elements = document.querySelectorAll<HTMLElement>(combinedSelector);
+		elements.forEach((el) => {
+			// Observe elements that need optimization (not yet optimized or width changed)
+			// We observe ALL matching elements, not just optimized ones, to catch new elements
+			const currentWidth = el.clientWidth;
+			const previousWidth = parseFloat(el.getAttribute('data-pretext-width') || '0');
 
-				if (!el.hasAttribute('data-pretext-optimized') ||
-					Math.abs(currentWidth - previousWidth) > 10) {
-					this.resizeObserver.observe(el);
-				}
-			});
-		}
+			if (!el.hasAttribute('data-pretext-optimized') ||
+				Math.abs(currentWidth - previousWidth) > 10) {
+				this.resizeObserver.observe(el);
+			}
+		});
 	}
 
 	onunload() {
-		console.log('[Pretext Optimizer] Unloading plugin...');
+		logger.info('Unloading plugin...');
 		this.pretextManager?.clearCache();
 		this.measurementCache?.clear();
 		this.resizeObserver?.disconnect();

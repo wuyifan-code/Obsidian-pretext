@@ -1,5 +1,6 @@
 import { MeasurementCache } from './MeasurementCache';
 import { FontInfo } from './utils/FontMetrics';
+import { logger } from './utils/logger';
 
 // Pretext type definitions (matching @chenglou/pretext API)
 type PreparedText = unknown;
@@ -43,12 +44,12 @@ export class PretextManager {
 
 		if (window.Pretext) {
 			this.loaded = true;
-			console.log('[PretextManager] Pretext library loaded successfully.');
+			logger.info('Pretext library loaded successfully.');
 			return true;
 		}
 
 		this.loadFailed = true;
-		console.warn('[PretextManager] Pretext not available, performance may not improve.');
+		logger.warn('Pretext not available, performance may not improve.');
 		return false;
 	}
 
@@ -60,7 +61,7 @@ export class PretextManager {
 				whiteSpace: 'normal',
 			});
 		} catch (err: unknown) {
-			console.warn('[PretextManager] prepare() failed:', err);
+			logger.warn('prepare() failed:', err);
 			return null;
 		}
 	}
@@ -74,7 +75,7 @@ export class PretextManager {
 			// we'll rely on Pretext's own caching and our MeasurementCache for broader scenarios
 			return window.Pretext.layout(prepared, maxWidth, lineHeight);
 		} catch (err: unknown) {
-			console.warn('[PretextManager] layout() failed:', err);
+			logger.warn('layout() failed:', err);
 			return null;
 		}
 	}
@@ -85,7 +86,7 @@ export class PretextManager {
 		try {
 			return window.Pretext.layoutWithLines(prepared, maxWidth, lineHeight);
 		} catch (err: unknown) {
-			console.warn('[PretextManager] layoutWithLines() failed:', err);
+			logger.warn('layoutWithLines() failed:', err);
 			return null;
 		}
 	}
@@ -100,7 +101,7 @@ export class PretextManager {
 		try {
 			window.Pretext.walkLineRanges(prepared, maxWidth, onLine);
 		} catch (err: unknown) {
-			console.warn('[PretextManager] walkLineRanges() failed:', err);
+			logger.warn('walkLineRanges() failed:', err);
 		}
 	}
 

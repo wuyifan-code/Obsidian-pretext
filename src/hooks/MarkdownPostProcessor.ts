@@ -4,16 +4,16 @@ import { MeasurementCache } from '../MeasurementCache';
 import { HEAVY_SELECTORS, processHeavyElement } from './HeavyElementOptimizer';
 
 export function createMarkdownPostProcessor(pretextManager: PretextManager, cache: MeasurementCache): MarkdownPostProcessor {
-	return (element: HTMLElement, context: { _sourcePath: string }) => {
+	return (element: HTMLElement, context: any) => {
 		if (!pretextManager.isReady()) {
 			return;
 		}
 
 		// Find heavy elements to optimize
-		for (const selector of HEAVY_SELECTORS) {
-			const heavyEls = element.querySelectorAll<HTMLElement>(selector);
-			heavyEls.forEach((el) => processHeavyElement(el, pretextManager, cache));
-		}
+		// Combine selectors to reduce querySelectorAll calls and DOM traversals
+		const combinedSelector = HEAVY_SELECTORS.join(', ');
+		const heavyEls = element.querySelectorAll<HTMLElement>(combinedSelector);
+		heavyEls.forEach((el) => processHeavyElement(el, pretextManager, cache));
 	};
 }
 
