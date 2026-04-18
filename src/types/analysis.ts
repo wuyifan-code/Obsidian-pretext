@@ -35,13 +35,13 @@ export type SegmentBreakKind =
  */
 export interface TextSegment {
 	/** 片段文本内容 */
-	text: string;
+	readonly text: string;
 	/** 是否为类似单词的片段 */
-	isWordLike: boolean;
+	readonly isWordLike: boolean;
 	/** 片段类型 */
-	kind: SegmentBreakKind;
+	readonly kind: SegmentBreakKind;
 	/** 在原始文本中的起始位置 */
-	start: number;
+	readonly start: number;
 }
 
 /**
@@ -49,13 +49,13 @@ export interface TextSegment {
  */
 export interface AnalysisChunk {
 	/** 区块文本内容 */
-	text: string;
+	readonly text: string;
 	/** 在原始文本中的起始位置 */
-	start: number;
+	readonly start: number;
 	/** 在原始文本中的结束位置 */
-	end: number;
+	readonly end: number;
 	/** 该区块的分词结果 */
-	segments: TextSegment[];
+	readonly segments: ReadonlyArray<TextSegment>;
 }
 
 /**
@@ -63,13 +63,13 @@ export interface AnalysisChunk {
  */
 export interface TextAnalysisResult {
 	/** 原始输入文本 */
-	originalText: string;
+	readonly originalText: string;
 	/** 分析后的区块列表 */
-	chunks: AnalysisChunk[];
+	readonly chunks: ReadonlyArray<AnalysisChunk>;
 	/** 总片段数 */
-	totalSegments: number;
+	readonly totalSegments: number;
 	/** 分析耗时（毫秒） */
-	analysisTime: number;
+	readonly analysisTime: number;
 }
 
 /**
@@ -151,7 +151,7 @@ export interface CJKRange {
 /**
  * 预定义的 CJK 文字范围
  */
-export const CJK_RANGES: CJKRange[] = [
+const CJK_RANGES_INTERNAL: ReadonlyArray<CJKRange> = [
 	// CJK Unified Ideographs
 	{ name: 'CJK Unified Ideographs', start: 0x4e00, end: 0x9fff },
 	// CJK Unified Ideographs Extension A
@@ -182,7 +182,11 @@ export const CJK_RANGES: CJKRange[] = [
 	{ name: 'Hangul', start: 0xac00, end: 0xd7af },
 	// Halfwidth and Fullwidth Forms
 	{ name: 'Halfwidth', start: 0xff00, end: 0xffef }
-];
+] as const;
+
+export function getCJKRanges(): ReadonlyArray<CJKRange> {
+	return CJK_RANGES_INTERNAL;
+}
 
 /**
  * 错误类型

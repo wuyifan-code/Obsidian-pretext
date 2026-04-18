@@ -32,29 +32,55 @@ export class PretextManager {
 	}
 
 	async initialize(): Promise<boolean> {
-		// Pretext bundle is loaded via styles.css injection
-		// Wait for the script to execute - use polling with timeout
-		const maxWait = 5000;
-		const checkInterval = 50;
-		const startTime = Date.now();
-
-		while (!window.Pretext && Date.now() - startTime < maxWait) {
-			await new Promise((resolve) => setTimeout(resolve, checkInterval));
-		}
-
 		if (window.Pretext) {
 			this.loaded = true;
-			logger.info('Pretext library loaded successfully.');
+			logger.info('Pretext library already loaded.');
 			return true;
 		}
 
-		this.loadFailed = true;
-		logger.warn('Pretext not available, performance may not improve.');
-		return false;
+		// Pretext bundle is injected in main.ts
+		// Wait for the script to execute using a Promise
+		return new Promise((resolve) => {
+			const maxWait = 5000;
+			let timeoutId: number;
+
+			// Define the event listener
+			const onPretextLoaded = () => {
+				clearTimeout(timeoutId);
+				window.removeEventListener('pretext-loaded', onPretextLoaded);
+				this.loaded = true;
+				logger.info('Pretext library loaded successfully via event.');
+				resolve(true);
+			};
+
+			// Listen for the custom event dispatched in main.ts
+			window.addEventListener('pretext-loaded', onPretextLoaded);
+
+			// Fallback polling for robustness
+			const checkInterval = 50;
+			const startTime = Date.now();
+
+			const checkPretext = () => {
+				if (window.Pretext) {
+					onPretextLoaded();
+				} else if (Date.now() - startTime < maxWait) {
+					timeoutId = window.setTimeout(checkPretext, checkInterval);
+				} else {
+					window.removeEventListener('pretext-loaded', onPretextLoaded);
+					this.loadFailed = true;
+					logger.warn('Pretext not available after timeout, performance may not improve.');
+					resolve(false);
+				}
+			};
+
+			checkPretext();
+		});
 	}
 
-	prepare(text: string, font: FontInfo): PreparedText | null {
-		if (!this.loaded || !window.Pretext) return null;
+	prepare(text: string, font: FontInfo): PreparedText | Error {
+		if (!this.loaded || !window.Pretext) {
+			return new Error('Pretext is not loaded or not ready.');
+		}
 
 		try {
 			return window.Pretext.prepare(text, font.fontFamily, {
@@ -62,12 +88,14 @@ export class PretextManager {
 			});
 		} catch (err: unknown) {
 			logger.warn('prepare() failed:', err);
-			return null;
+			return err instanceof Error ? err : new Error(String(err));
 		}
 	}
 
-	layout(prepared: PreparedText, maxWidth: number, lineHeight: number): LayoutResult | null {
-		if (!this.loaded || !window.Pretext || !prepared) return null;
+	layout(prepared: PreparedText, maxWidth: number, lineHeight: number): LayoutResult | Error {
+		if (!this.loaded || !window.Pretext || !prepared) {
+			return new Error('Pretext is not loaded or prepared text is missing.');
+		}
 
 		try {
 			// For caching, we need to extract text and font info from prepared text
@@ -76,18 +104,20 @@ export class PretextManager {
 			return window.Pretext.layout(prepared, maxWidth, lineHeight);
 		} catch (err: unknown) {
 			logger.warn('layout() failed:', err);
-			return null;
+			return err instanceof Error ? err : new Error(String(err));
 		}
 	}
 
-	layoutWithLines(prepared: PreparedText, maxWidth: number, lineHeight: number): LayoutLinesResult | null {
-		if (!this.loaded || !window.Pretext || !prepared) return null;
+	layoutWithLines(prepared: PreparedText, maxWidth: number, lineHeight: number): LayoutLinesResult | Error {
+		if (!this.loaded || !window.Pretext || !prepared) {
+			return new Error('Pretext is not loaded or prepared text is missing.');
+		}
 
 		try {
 			return window.Pretext.layoutWithLines(prepared, maxWidth, lineHeight);
 		} catch (err: unknown) {
 			logger.warn('layoutWithLines() failed:', err);
-			return null;
+			return err instanceof Error ? err : new Error(String(err));
 		}
 	}
 

@@ -173,9 +173,9 @@ export function createPretextCodeMirrorExtension(pretextManager: PretextManager,
 					this.pendingQueue.delete(text);
 
 					const prepared = pretextManager.prepare(text, this.fontInfo!);
-					if (prepared) {
+					if (!(prepared instanceof Error)) {
 						const layoutResult = pretextManager.layout(prepared, this.contentWidth, lineHeightUnit);
-						if (layoutResult) {
+						if (!(layoutResult instanceof Error)) {
 							const cacheKey = cache.getCacheKey(
 								text,
 								this.fontInfo!.fontFamily,

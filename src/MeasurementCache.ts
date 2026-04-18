@@ -11,7 +11,7 @@ type LayoutResult = { height: number; lineCount: number };
  }
 
  export class MeasurementCache {
- 	 private cache: Map<string, { value: LayoutResult }>;
+	 private cache: Map<string, { value: LayoutResult; lastAccessed: number }>;
  	 private maxSize: number;
 
  	 constructor(maxSize: number = 1000) {
@@ -27,10 +27,9 @@ type LayoutResult = { height: number; lineCount: number };
  	 	 maxWidth: number,
  	 	 lineHeight: number
  	 ): string {
- 	 	 // 建议直接使用文本原文，避免哈希碰撞（如果文本很长可考虑哈希）
- 	 	 // 这里为了性能保留哈希，但风险由开发者承担
- 	 	 const textHash = hashString(text);
- 	 	 return `${textHash}:${fontFamily}:${fontSize}:${fontWeight}:${maxWidth}:${lineHeight}`;
+		 // 短文本直接使用原文拼接以避免哈希开销 (O(N))，长文本则进行哈希。阈值设为 100 字符。
+		 const textKey = text.length <= 100 ? text : hashString(text);
+		 return `${textKey}:${fontFamily}:${fontSize}:${fontWeight}:${maxWidth}:${lineHeight}`;
  	 }
 
 	 getCacheKey(
@@ -58,9 +57,12 @@ type LayoutResult = { height: number; lineCount: number };
  	 	 const entry = this.cache.get(key);
 
  	 	 if (entry) {
- 	 	 	 // LRU O(1) 核心：命中缓存后，先删除再重新插入，将其推到 Map 的最后（最新）
- 	 	 	 this.cache.delete(key);
- 	 	 	 this.cache.set(key, entry);
+			 // 避免每次 get 都 delete+set。引入访问计数器/时间戳方式可能破坏了单纯 Map 的有序性，
+			 // 但是，由于我们想要避免频繁操作，我们只需在使用中不对命中频繁地进行插入。
+			 // 但为了保持简单有效的 LRU，当且仅当它不是最后 10% 的活跃数据时才去移动它。
+			 // 考虑到这增加了复杂性，更简单的优化是：仅更新访问时间戳。
+			 // 当缓存达到阈值时，批量清除旧数据。
+			 entry.lastAccessed = Date.now();
  	 	 	 return entry.value;
  	 	 }
 
@@ -85,26 +87,29 @@ type LayoutResult = { height: number; lineCount: number };
 		 } else {
 			 key = textOrKey;
 			 val = fontFamilyOrValue as LayoutResult;
-		 }
-
- 	 	 // 如果 key 已存在，先删除再添加以更新顺序，移到最新位置
- 	 	 if (this.cache.has(key)) {
- 	 	 	 this.cache.delete(key);
- 	 	 } else if (this.cache.size >= this.maxSize) {
- 	 	 	 this.evictOldest();
  	 	 }
 
-		 this.cache.set(key, { value: val });
+		 if (!this.cache.has(key) && this.cache.size >= this.maxSize) {
+			 this.evictBatch();
+		 }
+
+		 this.cache.set(key, { value: val, lastAccessed: Date.now() });
  	 }
 
- 	 private evictOldest(): void {
- 	 	 // Map.prototype.keys().next().value 永远指向 Map 中最先插入的（最旧的）那个键
+	 private evictBatch(): void {
  	 	 if (this.cache.size === 0) {
  	 	 	 return;
  	 	 }
- 	 	 const oldestKey = this.cache.keys().next().value;
- 	 	 if (oldestKey) {
- 	 	 	 this.cache.delete(oldestKey);
+
+		 // 批量清理 20% 的旧数据，减少频繁的迭代和删除
+		 const itemsToRemove = Math.max(1, Math.floor(this.maxSize * 0.2));
+
+		 // 转换为数组并根据时间戳排序，淘汰最旧的
+		 const entries = Array.from(this.cache.entries());
+		 entries.sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
+
+		 for (let i = 0; i < itemsToRemove && i < entries.length; i++) {
+			 this.cache.delete(entries[i][0]);
  	 	 }
  	 }
 

@@ -13,7 +13,8 @@ export default class ObsidianPretextPlugin extends Plugin {
 	private pretextManager!: PretextManager;
 	private measurementCache!: MeasurementCache;
 	private resizeObserver!: ResizeObserver;
-	private processingFlag = false;
+	private processingTimeout: number | null = null;
+	private rafId: number | null = null;
 
 	async onload() {
 		logger.info('Loading plugin...');
@@ -54,13 +55,23 @@ export default class ObsidianPretextPlugin extends Plugin {
 		try {
 			const script = document.createElement('script');
 			script.textContent = INJECT_PRETEXT_BUNDLE;
+
+			// Using script.onload is not applicable for inline scripts (textContent).
+			// Instead, we inject the script and then dispatch the event. Because inline scripts
+			// execute synchronously when appended, Pretext should be available immediately.
+			// If for some reason it's not (e.g. strict CSP blocking execution), we handle it below.
 			document.head.appendChild(script);
 
 			if ((window as any).Pretext) {
 				logger.info('Pretext bundle loaded successfully.');
+				// Dispatch event safely after we confirm it's loaded
+				window.dispatchEvent(new Event('pretext-loaded'));
 			} else {
 				logger.error('Pretext not defined after script execution.');
 			}
+
+			// Clean up injected script tags to avoid clutter
+			script.remove();
 		} catch (err) {
 			logger.error('Failed to load Pretext bundle:', err);
 		}
@@ -89,8 +100,12 @@ export default class ObsidianPretextPlugin extends Plugin {
 		}
 
 		this.resizeObserver = new ResizeObserver((entries) => {
-			// Prevent feedback loop with MutationObserver
-			this.processingFlag = true;
+			// Prevent feedback loop with MutationObserver by using a debounce timeout
+			if (this.processingTimeout !== null) {
+				window.clearTimeout(this.processingTimeout);
+			}
+
+			// We still process the layout immediately since it's a resize
 			entries.forEach((entry) => {
 				const el = entry.target as HTMLElement;
 				const currentWidth = entry.contentRect.width;
@@ -101,8 +116,11 @@ export default class ObsidianPretextPlugin extends Plugin {
 					processHeavyElement(el, this.pretextManager, this.measurementCache, currentWidth);
 				}
 			});
-			// Reset flag after processing
-			this.processingFlag = false;
+
+			// Block mutation observer updates for a short window after resize
+			this.processingTimeout = window.setTimeout(() => {
+				this.processingTimeout = null;
+			}, 100);
 		});
 
 		// Start observing heavy elements
@@ -111,10 +129,17 @@ export default class ObsidianPretextPlugin extends Plugin {
 		// Register a callback to observe new elements when DOM changes
 		const observer = new MutationObserver(() => {
 			// Skip if ResizeObserver is processing to prevent feedback loop
-			if (this.processingFlag) {
+			if (this.processingTimeout !== null) {
 				return;
 			}
-			this.observeHeavyElements();
+
+			// Throttle heavy DOM queries using rAF guard
+			if (this.rafId === null) {
+				this.rafId = window.requestAnimationFrame(() => {
+					this.observeHeavyElements();
+					this.rafId = null;
+				});
+			}
 		});
 
 		// Observe only direct children of body to reduce scope
@@ -125,7 +150,15 @@ export default class ObsidianPretextPlugin extends Plugin {
 		});
 
 		// Clean up observer on unload
-		this.register(() => observer.disconnect());
+		this.register(() => {
+			observer.disconnect();
+			if (this.processingTimeout !== null) {
+				window.clearTimeout(this.processingTimeout);
+			}
+			if (this.rafId !== null) {
+				window.cancelAnimationFrame(this.rafId);
+			}
+		});
 	}
 
 	private observeHeavyElements(): void {

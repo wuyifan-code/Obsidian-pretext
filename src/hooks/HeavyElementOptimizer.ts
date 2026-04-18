@@ -54,12 +54,12 @@ export function processHeavyElement(el: HTMLElement, pretextManager: PretextMana
 
 	// Prepare and layout with Pretext
 	const prepared = pretextManager.prepare(text, font);
-	if (!prepared) {
+	if (prepared instanceof Error) {
 		return;
 	}
 
 	const layout = pretextManager.layout(prepared, maxWidth, lineHeightUnit);
-	if (!layout) {
+	if (layout instanceof Error) {
 		return;
 	}
 
