@@ -1,3 +1,5 @@
+import type { EditorView, Decoration, DecorationSet, ViewUpdate } from '@codemirror/view';
+import type { RangeSetBuilder, AnnotationType, Transaction } from '@codemirror/state';
 import { PretextManager } from '../PretextManager';
 import { MeasurementCache } from '../MeasurementCache';
 import { getFontInfoFromElement } from '../utils/FontMetrics';
@@ -8,14 +10,10 @@ import { logger } from '../utils/logger';
 type IdleDeadlineObj = { timeRemaining: () => number; didTimeout?: boolean };
 
 // CodeMirror module references - initialized lazily at runtime
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let EditorViewClass: any = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let DecorationClass: any = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let RangeSetBuilderClass: any = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let MeasureCompleteAnnotation: any = null;
+let EditorViewClass: typeof EditorView | null = null;
+let DecorationClass: typeof Decoration | null = null;
+let RangeSetBuilderClass: typeof RangeSetBuilder | null = null;
+let MeasureCompleteAnnotation: AnnotationType<boolean> | null = null;
 
 function getCodeMirrorModules(): boolean {
 	if (EditorViewClass && DecorationClass && RangeSetBuilderClass) {
@@ -24,7 +22,7 @@ function getCodeMirrorModules(): boolean {
 
 	// Access Obsidian's internal CodeMirror via window
 	// Obsidian 1.5+ bundles CodeMirror 6 internally
-	const win = window as any;
+	const win = window as unknown as { CodeMirror: any };
 	const cm = win.CodeMirror;
 	if (cm?.view?.EditorView && cm?.view?.Decoration && cm?.state?.RangeSetBuilder) {
 		EditorViewClass = cm.view.EditorView;
@@ -42,32 +40,32 @@ export function createPretextCodeMirrorExtension(pretextManager: PretextManager,
 	if (!getCodeMirrorModules() || !EditorViewClass || !DecorationClass || !RangeSetBuilderClass) {
 		logger.error('CodeMirror not available');
 		// Return a minimal extension that does nothing
-		return EditorViewClass?.plugin?.define
-			? EditorViewClass.plugin.define(
+		return EditorViewClass ? (EditorViewClass as any).plugin?.define(
 					class {
-						decorations = DecorationClass?.none ?? { map: () => this.decorations };
+						decorations: DecorationSet = DecorationClass?.none ?? ({} as unknown as DecorationSet);
 					},
-					{ decorations: (v: any) => v.decorations }
+					{ decorations: (v: { decorations: DecorationSet }) => v.decorations }
 			  )
 			: {};
 	}
 
-	return EditorViewClass.plugin.define(
+	return (EditorViewClass as any).plugin.define(
 		class {
-			view: any;
-			decorations: any;
+
+			view: EditorView;
+			decorations: DecorationSet;
 			private pendingQueue: Set<string> = new Set();
 			private idleCallbackId: number | null = null;
 			private fontInfo: FontInfo | null = null;
 			private contentWidth: number = 0;
 
-			constructor(view: any) {
+			constructor(view: EditorView) {
 				this.view = view;
 				this.updateMetrics();
 				this.decorations = this.buildDecorations(view);
 			}
 
-			update(view: any): void {
+			update(view: ViewUpdate): void {
 				if (!pretextManager.isReady()) return;
 
 				let needsRebuild = false;
@@ -80,7 +78,7 @@ export function createPretextCodeMirrorExtension(pretextManager: PretextManager,
 				if (
 					view.docChanged ||
 					view.viewportChanged ||
-					(view.transactions?.some?.((tr: any) => tr.annotation(MeasureCompleteAnnotation)))
+					(view.transactions?.some((tr: Transaction) => tr.annotation(MeasureCompleteAnnotation!)))
 				) {
 					needsRebuild = true;
 				}
@@ -98,11 +96,11 @@ export function createPretextCodeMirrorExtension(pretextManager: PretextManager,
 				}
 			}
 
-			private buildDecorations(view: any): any {
-				const builder = new RangeSetBuilderClass();
-				const { from, to } = view.viewport;
+			private buildDecorations(view: EditorView | ViewUpdate): DecorationSet {
+				const builder = new RangeSetBuilderClass!<Decoration>();
+				const { from, to } = (view as any).viewport || (view as ViewUpdate).view.viewport || { from: 0, to: 0 };
 
-				if (to <= from || !this.fontInfo) return DecorationClass.none;
+				if (to <= from || !this.fontInfo) return DecorationClass ? DecorationClass.none : ({} as unknown as DecorationSet);
 
 				const lineHeightUnit = this.fontInfo.lineHeight / this.fontInfo.fontSize;
 				let hasNewPending = false;
@@ -123,7 +121,7 @@ export function createPretextCodeMirrorExtension(pretextManager: PretextManager,
 						const cached = cache.get(cacheKey);
 
 						if (cached) {
-							const lineDeco = DecorationClass.line({
+							const lineDeco = DecorationClass!.line({
 								attributes: {
 									style: `min-height: ${cached.height}px;`,
 									'data-pretext-cm': 'true',
@@ -151,8 +149,8 @@ export function createPretextCodeMirrorExtension(pretextManager: PretextManager,
 				if (this.idleCallbackId !== null) return;
 
 				const schedule =
-					typeof window !== 'undefined' && (window as any).requestIdleCallback
-						? (window as any).requestIdleCallback
+					typeof window !== 'undefined' && (window as unknown as { requestIdleCallback?: any }).requestIdleCallback
+						? (window as unknown as { requestIdleCallback: any }).requestIdleCallback
 						: ((cb: (deadline: IdleDeadlineObj) => void) => setTimeout(() => cb({ timeRemaining: () => 10 }), 50));
 
 				this.idleCallbackId = schedule((deadline: IdleDeadlineObj) => {
@@ -190,7 +188,7 @@ export function createPretextCodeMirrorExtension(pretextManager: PretextManager,
 					}
 				}
 
-				if (processedCount > 0 && !this.view.isDestroyed) {
+				if (processedCount > 0 && !(this.view as unknown as { isDestroyed: boolean }).isDestroyed) {
 					this.view.dispatch({
 						annotations: MeasureCompleteAnnotation?.of(true),
 					});
@@ -204,8 +202,8 @@ export function createPretextCodeMirrorExtension(pretextManager: PretextManager,
 			destroy(): void {
 				if (this.idleCallbackId !== null) {
 					const cancel =
-						typeof window !== 'undefined' && (window as any).cancelIdleCallback
-							? (window as any).cancelIdleCallback
+						typeof window !== 'undefined' && (window as unknown as { cancelIdleCallback?: any }).cancelIdleCallback
+							? (window as unknown as { cancelIdleCallback: any }).cancelIdleCallback
 							: clearTimeout;
 					cancel(this.idleCallbackId);
 				}
@@ -213,7 +211,7 @@ export function createPretextCodeMirrorExtension(pretextManager: PretextManager,
 			}
 		},
 		{
-			decorations: (v: any) => v.decorations,
+			decorations: (v: { decorations: DecorationSet }) => v.decorations,
 		}
 	);
 }

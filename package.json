@@ -20,7 +20,10 @@
   "license": "MIT",
   "type": "commonjs",
   "devDependencies": {
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.41.1",
     "@types/css": "^0.0.38",
+    "@types/dom-webcodecs": "^0.1.18",
     "@types/node": "^25.5.0",
     "@vitest/coverage-v8": "^2.0.0",
     "esbuild": "^0.27.4",
