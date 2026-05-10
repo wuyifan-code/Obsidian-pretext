@@ -86,7 +86,7 @@ export class Logger {
 	/**
 	 * 格式化日志消息
 	 */
-	private formatMessage(message: string, ...args: any[]): string {
+	private formatMessage(message: string, ...args: unknown[]): string {
 		let formatted = message;
 		if (args.length > 0) {
 			formatted += ' ' + args.map(arg => {
@@ -118,7 +118,7 @@ export class Logger {
 	/**
 	 * 记录调试信息
 	 */
-	debug(message: string, ...args: any[]): void {
+	debug(message: string, ...args: unknown[]): void {
 		if (this.level > LogLevel.DEBUG) return;
 		const timestamp = this.getTimestamp();
 		const prefix = timestamp ? `[${timestamp}] ${this.PREFIX}` : this.PREFIX;
@@ -129,7 +129,7 @@ export class Logger {
 	/**
 	 * 记录一般信息
 	 */
-	info(message: string, ...args: any[]): void {
+	info(message: string, ...args: unknown[]): void {
 		if (this.level > LogLevel.INFO) return;
 		const timestamp = this.getTimestamp();
 		const prefix = timestamp ? `[${timestamp}] ${this.PREFIX}` : this.PREFIX;
@@ -140,7 +140,7 @@ export class Logger {
 	/**
 	 * 记录警告信息
 	 */
-	warn(message: string, ...args: any[]): void {
+	warn(message: string, ...args: unknown[]): void {
 		if (this.level > LogLevel.WARN) return;
 		const timestamp = this.getTimestamp();
 		const prefix = timestamp ? `[${timestamp}] ${this.PREFIX}` : this.PREFIX;
@@ -151,7 +151,7 @@ export class Logger {
 	/**
 	 * 记录错误信息
 	 */
-	error(message: string, ...args: any[]): void {
+	error(message: string, ...args: unknown[]): void {
 		if (this.level > LogLevel.ERROR) return;
 		const timestamp = this.getTimestamp();
 		const prefix = timestamp ? `[${timestamp}] ${this.PREFIX}` : this.PREFIX;
@@ -471,27 +471,27 @@ export const performanceMonitor = PerformanceMonitor.getInstance();
 /**
  * 便捷函数：快速记录调试信息
  */
-export function debug(message: string, ...args: any[]): void {
+export function debug(message: string, ...args: unknown[]): void {
 	logger.debug(message, ...args);
 }
 
 /**
  * 便捷函数：快速记录一般信息
  */
-export function info(message: string, ...args: any[]): void {
+export function info(message: string, ...args: unknown[]): void {
 	logger.info(message, ...args);
 }
 
 /**
  * 便捷函数：快速记录警告信息
  */
-export function warn(message: string, ...args: any[]): void {
+export function warn(message: string, ...args: unknown[]): void {
 	logger.warn(message, ...args);
 }
 
 /**
  * 便捷函数：快速记录错误信息
  */
-export function error(message: string, ...args: any[]): void {
+export function error(message: string, ...args: unknown[]): void {
 	logger.error(message, ...args);
 }
