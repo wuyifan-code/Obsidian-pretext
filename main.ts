@@ -14,6 +14,10 @@ export default class ObsidianPretextPlugin extends Plugin {
 	private measurementCache!: MeasurementCache;
 	private resizeObserver!: ResizeObserver;
 	private processingFlag = false;
+	// Throttle: RAF handle for observeHeavyElements
+	private rafId: number | null = null;
+	// Track which elements are already observed to avoid duplicates
+	private observedElements = new WeakSet<HTMLElement>();
 
 	async onload() {
 		logger.info('Loading plugin...');
@@ -109,12 +113,41 @@ export default class ObsidianPretextPlugin extends Plugin {
 		this.observeHeavyElements();
 
 		// Register a callback to observe new elements when DOM changes
-		const observer = new MutationObserver(() => {
+		const observer = new MutationObserver((mutations) => {
 			// Skip if ResizeObserver is processing to prevent feedback loop
 			if (this.processingFlag) {
 				return;
 			}
-			this.observeHeavyElements();
+
+			// Collect new heavy elements from mutations (local scan, not full document)
+			const newHeavyElements: HTMLElement[] = [];
+			for (const mutation of mutations) {
+				if (mutation.type === 'childList') {
+					for (const node of mutation.addedNodes) {
+						if (node instanceof Element) {
+							// Check if the added node itself matches a heavy selector
+							for (const selector of HEAVY_SELECTORS) {
+								if (node.matches(selector)) {
+									newHeavyElements.push(node as HTMLElement);
+								}
+							}
+							// Also look for heavy elements within added subtree
+							for (const selector of HEAVY_SELECTORS) {
+								const matches = node.querySelectorAll<HTMLElement>(selector);
+								matches.forEach(el => newHeavyElements.push(el));
+							}
+						}
+					}
+				}
+			}
+
+			// Throttle: schedule observe using RAF to avoid processing every mutation
+			if (newHeavyElements.length > 0 && this.rafId === null) {
+				this.rafId = requestAnimationFrame(() => {
+					this.rafId = null;
+					this.observeNewElements(newHeavyElements);
+				});
+			}
 		});
 
 		// Observe only direct children of body to reduce scope
@@ -133,20 +166,51 @@ export default class ObsidianPretextPlugin extends Plugin {
 			return;
 		}
 
-		// Find and observe heavy elements
-		const combinedSelector = HEAVY_SELECTORS.join(', ');
-		const elements = document.querySelectorAll<HTMLElement>(combinedSelector);
-		elements.forEach((el) => {
-			// Observe elements that need optimization (not yet optimized or width changed)
-			// We observe ALL matching elements, not just optimized ones, to catch new elements
-			const currentWidth = el.clientWidth;
-			const previousWidth = parseFloat(el.getAttribute('data-pretext-width') || '0');
+		// Optimized: scan only visible content containers instead of whole document
+		const containers = document.querySelectorAll<HTMLElement>(
+			'.markdown-preview-view, .markdown-source-view, .mod-active'
+		);
 
-			if (!el.hasAttribute('data-pretext-optimized') ||
-				Math.abs(currentWidth - previousWidth) > 10) {
-				this.resizeObserver.observe(el);
+		if (containers.length === 0) {
+			return;
+		}
+
+		// Local scan: for each container, find heavy elements within it
+		for (const container of containers) {
+			for (const selector of HEAVY_SELECTORS) {
+				const elements = container.querySelectorAll<HTMLElement>(selector);
+				elements.forEach((el) => {
+					// Skip already optimized elements
+					if (el.hasAttribute('data-pretext-optimized')) {
+						return;
+					}
+					const currentWidth = el.clientWidth;
+					const previousWidth = parseFloat(el.getAttribute('data-pretext-width') || '0');
+
+					if (Math.abs(currentWidth - previousWidth) > 10) {
+						this.resizeObserver.observe(el);
+					}
+				});
 			}
-		});
+		}
+	}
+
+	/**
+	 * Observe newly added heavy elements (local scan, not full document).
+	 */
+	private observeNewElements(elements: HTMLElement[]): void {
+		if (!this.resizeObserver || !this.pretextManager.isReady()) {
+			return;
+		}
+
+		// Deduplicate using WeakSet
+		for (const el of elements) {
+			if (this.observedElements.has(el)) {
+				continue;
+			}
+			this.observedElements.add(el);
+			this.resizeObserver.observe(el);
+		}
 	}
 
 	onunload() {

@@ -3,17 +3,52 @@ import { PretextManager } from '../PretextManager';
 import { MeasurementCache } from '../MeasurementCache';
 import { HEAVY_SELECTORS, processHeavyElement } from './HeavyElementOptimizer';
 
+/** Max elements to process per batch */
+const BATCH_SIZE = 5;
+
 export function createMarkdownPostProcessor(pretextManager: PretextManager, cache: MeasurementCache): MarkdownPostProcessor {
 	return (element: HTMLElement, context: any) => {
 		if (!pretextManager.isReady()) {
 			return;
 		}
 
-		// Find heavy elements to optimize
-		// Combine selectors to reduce querySelectorAll calls and DOM traversals
-		const combinedSelector = HEAVY_SELECTORS.join(', ');
-		const heavyEls = element.querySelectorAll<HTMLElement>(combinedSelector);
-		heavyEls.forEach((el) => processHeavyElement(el, pretextManager, cache));
+		// Collect all heavy elements under this root element
+		const allHeavyEls: HTMLElement[] = [];
+		for (const selector of HEAVY_SELECTORS) {
+			const heavyEls = element.querySelectorAll<HTMLElement>(selector);
+			heavyEls.forEach((el) => allHeavyEls.push(el));
+		}
+
+		// Process in batches using requestIdleCallback
+		let index = 0;
+
+		function processBatch(deadline: IdleDeadline) {
+			while (index < allHeavyEls.length && deadline.timeRemaining() > 2) {
+				const el = allHeavyEls[index++];
+				processHeavyElement(el, pretextManager, cache);
+			}
+
+			if (index < allHeavyEls.length) {
+				if (typeof window !== 'undefined' && (window as any).requestIdleCallback) {
+					(window as any).requestIdleCallback(processBatch);
+				} else {
+					setTimeout(() => processBatch({ timeRemaining: () => 10 } as IdleDeadline), 0);
+				}
+			}
+		}
+
+		if (allHeavyEls.length > 0) {
+			if (typeof window !== 'undefined' && (window as any).requestIdleCallback) {
+				(window as any).requestIdleCallback(processBatch);
+			} else {
+				// Fallback: process synchronously if requestIdleCallback not available
+				allHeavyEls.forEach((el) => processHeavyElement(el, pretextManager, cache));
+			}
+		}
 	};
+}
+
+interface IdleDeadline {
+	timeRemaining: () => number;
 }
 

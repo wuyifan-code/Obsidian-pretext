@@ -10,8 +10,9 @@
 		"rootDir": ".",
 		"declaration": false,
 		"sourceMap": false,
-		"lib": ["ES2022", "DOM"]
+		"lib": ["ES2022", "DOM"],
+		"noEmit": true
 	},
-	"include": ["src/**/*.ts", "main.ts", "src/types/**/*.ts"],
+	"include": ["src/**/*.ts", "main.ts"],
 	"exclude": ["node_modules"]
 }

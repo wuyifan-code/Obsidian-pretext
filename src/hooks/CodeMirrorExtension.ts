@@ -104,7 +104,7 @@ export function createPretextCodeMirrorExtension(pretextManager: PretextManager,
 
 				if (to <= from || !this.fontInfo) return DecorationClass.none;
 
-				const lineHeightUnit = this.fontInfo.lineHeight / this.fontInfo.fontSize;
+				const lineHeightPx = this.fontInfo.lineHeight;
 				let hasNewPending = false;
 
 				for (let pos = from; pos <= to; ) {
@@ -118,7 +118,7 @@ export function createPretextCodeMirrorExtension(pretextManager: PretextManager,
 							this.fontInfo.fontSize,
 							this.fontInfo.fontWeight,
 							this.contentWidth,
-							lineHeightUnit
+							lineHeightPx
 						);
 						const cached = cache.get(cacheKey);
 
@@ -164,7 +164,7 @@ export function createPretextCodeMirrorExtension(pretextManager: PretextManager,
 			private processQueue(deadline: IdleDeadlineObj): void {
 				if (this.pendingQueue.size === 0 || !pretextManager.isReady()) return;
 
-				const lineHeightUnit = this.fontInfo!.lineHeight / this.fontInfo!.fontSize;
+				const lineHeightPx = this.fontInfo!.lineHeight;
 				let processedCount = 0;
 
 				for (const text of this.pendingQueue) {
@@ -174,7 +174,7 @@ export function createPretextCodeMirrorExtension(pretextManager: PretextManager,
 
 					const prepared = pretextManager.prepare(text, this.fontInfo!);
 					if (prepared) {
-						const layoutResult = pretextManager.layout(prepared, this.contentWidth, lineHeightUnit);
+						const layoutResult = pretextManager.layout(prepared, this.contentWidth, lineHeightPx);
 						if (layoutResult) {
 							const cacheKey = cache.getCacheKey(
 								text,
@@ -182,7 +182,7 @@ export function createPretextCodeMirrorExtension(pretextManager: PretextManager,
 								this.fontInfo!.fontSize,
 								this.fontInfo!.fontWeight,
 								this.contentWidth,
-								lineHeightUnit
+								lineHeightPx
 							);
 							cache.set(cacheKey, layoutResult);
 							processedCount++;

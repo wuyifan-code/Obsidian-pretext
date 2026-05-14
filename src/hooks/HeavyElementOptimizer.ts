@@ -30,8 +30,8 @@ export function processHeavyElement(el: HTMLElement, pretextManager: PretextMana
 	const font = getFontInfoFromElement(el);
 	const maxWidth = forceWidth || getContainerWidth(el);
 
-	// Convert px line-height to unitless for Pretext
-	const lineHeightUnit = font.lineHeight / font.fontSize;
+	// Pretext expects pixel line-height (see lib/pretext/layout.js:306)
+	const lineHeightPx = font.lineHeight;
 
 	// Check cache first
 	const cacheKey = cache.getCacheKey(
@@ -40,7 +40,7 @@ export function processHeavyElement(el: HTMLElement, pretextManager: PretextMana
 		font.fontSize,
 		font.fontWeight,
 		maxWidth,
-		lineHeightUnit
+		lineHeightPx
 	);
 
 	const cached = cache.get(cacheKey);
@@ -58,7 +58,7 @@ export function processHeavyElement(el: HTMLElement, pretextManager: PretextMana
 		return;
 	}
 
-	const layout = pretextManager.layout(prepared, maxWidth, lineHeightUnit);
+	const layout = pretextManager.layout(prepared, maxWidth, lineHeightPx);
 	if (!layout) {
 		return;
 	}
