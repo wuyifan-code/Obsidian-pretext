@@ -5,7 +5,29 @@ export interface FontInfo {
 	lineHeight: number;
 }
 
+/** Cache for font info per element to avoid repeated getComputedStyle calls. */
+const fontInfoCache = new WeakMap<HTMLElement, FontInfo>();
+/** Cache for container widths per element. */
+const containerWidthCache = new WeakMap<HTMLElement, number>();
+/** Invalidation flag — set true on resize or theme change. */
+let cacheInvalidated = false;
+
+// Invalidate on window resize
+if (typeof window !== 'undefined') {
+	window.addEventListener('resize', () => {
+		cacheInvalidated = true;
+	});
+}
+
+/**
+ * Get font info for an element, cached until next resize/theme change.
+ */
 export function getFontInfoFromElement(el: HTMLElement): FontInfo {
+	// Check if cache is still valid
+	if (!cacheInvalidated && fontInfoCache.has(el)) {
+		return fontInfoCache.get(el)!;
+	}
+
 	const style = window.getComputedStyle(el);
 
 	// Get font family, cleaning up quotes
@@ -25,16 +47,35 @@ export function getFontInfoFromElement(el: HTMLElement): FontInfo {
 	}
 	// If it's px, keep it as-is (already a number from parseFloat)
 
-	return {
+	const info: FontInfo = {
 		fontFamily,
 		fontSize,
 		fontWeight,
 		lineHeight,
 	};
+
+	fontInfoCache.set(el, info);
+	return info;
 }
 
+/**
+ * Get container width for an element, cached until next resize/theme change.
+ */
 export function getContainerWidth(el: HTMLElement): number {
+	if (!cacheInvalidated && containerWidthCache.has(el)) {
+		return containerWidthCache.get(el)!;
+	}
+
 	// Use clientWidth for content width excluding padding
 	// Fall back to a reasonable default if measurement fails
-	return el.clientWidth || 700;
+	const width = el.clientWidth || 700;
+	containerWidthCache.set(el, width);
+	return width;
+}
+
+/**
+ * Invalidate font and width caches. Call after theme changes.
+ */
+export function invalidateFontCache(): void {
+	cacheInvalidated = true;
 }

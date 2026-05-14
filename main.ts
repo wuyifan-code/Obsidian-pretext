@@ -183,10 +183,32 @@ export default class ObsidianPretextPlugin extends Plugin {
 		this.register(() => containerObserver.disconnect());
 	}
 
-	private observeHeavyElements(): void {
+private observeHeavyElements(): void {
 		if (!this.resizeObserver || !this.pretextManager.isReady()) {
 			return;
 		}
+
+		// Find and observe heavy elements
+		for (const selector of HEAVY_SELECTORS) {
+			const elements = document.querySelectorAll<HTMLElement>(selector);
+			elements.forEach((el) => {
+				// Skip if already observed to avoid duplicate ResizeObserver entries
+				if (this.observedElements.has(el)) {
+					return;
+				}
+				// Observe elements that need optimization (not yet optimized or width changed)
+				// We observe ALL matching elements, not just optimized ones, to catch new elements
+				const currentWidth = el.clientWidth;
+				const previousWidth = parseFloat(el.getAttribute('data-pretext-width') || '0');
+
+				if (!el.hasAttribute('data-pretext-optimized') ||
+					Math.abs(currentWidth - previousWidth) > 10) {
+					this.observedElements.add(el);
+					this.resizeObserver.observe(el);
+				}
+			});
+		}
+	}
 
 		// Optimized: scan only visible content containers instead of whole document
 		const containers = document.querySelectorAll<HTMLElement>(

@@ -2,16 +2,14 @@ import { PretextManager } from '../PretextManager';
 import { MeasurementCache } from '../MeasurementCache';
 import { getFontInfoFromElement, getContainerWidth } from '../utils/FontMetrics';
 
-// 导出常量供 main.ts 使用
+// Deduplicated CSS selectors for "heavy" elements that benefit from height pre-calculation.
+// Uses minimal, non-overlapping selectors to reduce duplicate matches.
+// Call processHeavyElement deduplication is handled by WeakSet in main.ts.
 export const HEAVY_SELECTORS = [
-	'.callout',
-	'.callout-content',
-	'.markdown-preview-view .callout',
-	'.markdown-source-view .callout',
-	// Large block quotes
-	'blockquote',
-	// Tables with potential wrapping
-	'table td',
+	'.callout',        // Covers .markdown-preview-view .callout and .markdown-source-view .callout
+	'.callout-content', // Inner content of callouts
+	'blockquote',      // Large block quotes
+	'table td',        // Tables with potential wrapping
 ];
 
 // 直接导出处理函数供 main.ts 调度
