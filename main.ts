@@ -112,53 +112,75 @@ export default class ObsidianPretextPlugin extends Plugin {
 		// Start observing heavy elements
 		this.observeHeavyElements();
 
-		// Register a callback to observe new elements when DOM changes
-		const observer = new MutationObserver((mutations) => {
-			// Skip if ResizeObserver is processing to prevent feedback loop
-			if (this.processingFlag) {
-				return;
-			}
+		// Dynamically attach MutationObserver to view containers
+		// This ensures we catch elements rendered deep in Obsidian's view hierarchy
+		this.setupViewObservers();
+	}
 
-			// Collect new heavy elements from mutations (local scan, not full document)
-			const newHeavyElements: HTMLElement[] = [];
-			for (const mutation of mutations) {
-				if (mutation.type === 'childList') {
-					for (const node of mutation.addedNodes) {
-						if (node instanceof Element) {
-							// Check if the added node itself matches a heavy selector
-							for (const selector of HEAVY_SELECTORS) {
-								if (node.matches(selector)) {
-									newHeavyElements.push(node as HTMLElement);
+	/**
+	 * Set up MutationObservers for view containers.
+	 * Observes .markdown-preview-view and .markdown-source-view instances.
+	 */
+	private setupViewObservers(): void {
+		const observeContainer = (container: Element) => {
+			const observer = new MutationObserver((mutations) => {
+				if (this.processingFlag) return;
+
+				const newHeavyElements: HTMLElement[] = [];
+				for (const mutation of mutations) {
+					if (mutation.type === 'childList') {
+						for (const node of mutation.addedNodes) {
+							if (node instanceof Element) {
+								for (const selector of HEAVY_SELECTORS) {
+									if (node.matches(selector)) {
+										newHeavyElements.push(node as HTMLElement);
+									}
 								}
-							}
-							// Also look for heavy elements within added subtree
-							for (const selector of HEAVY_SELECTORS) {
-								const matches = node.querySelectorAll<HTMLElement>(selector);
-								matches.forEach(el => newHeavyElements.push(el));
+								for (const selector of HEAVY_SELECTORS) {
+									const matches = node.querySelectorAll<HTMLElement>(selector);
+									matches.forEach(el => newHeavyElements.push(el));
+								}
 							}
 						}
 					}
 				}
-			}
 
-			// Throttle: schedule observe using RAF to avoid processing every mutation
-			if (newHeavyElements.length > 0 && this.rafId === null) {
-				this.rafId = requestAnimationFrame(() => {
-					this.rafId = null;
-					this.observeNewElements(newHeavyElements);
-				});
+				if (newHeavyElements.length > 0 && this.rafId === null) {
+					this.rafId = requestAnimationFrame(() => {
+						this.rafId = null;
+						this.observeNewElements(newHeavyElements);
+					});
+				}
+			});
+
+			observer.observe(container, { childList: true, subtree: true });
+			this.register(() => observer.disconnect());
+		};
+
+		// Observe existing containers
+		const existingContainers = document.querySelectorAll('.markdown-preview-view, .markdown-source-view');
+		existingContainers.forEach(container => observeContainer(container));
+
+		// Watch for new containers (e.g., when switching files)
+		const containerObserver = new MutationObserver((mutations) => {
+			for (const mutation of mutations) {
+				if (mutation.type === 'childList') {
+					for (const node of mutation.addedNodes) {
+						if (node instanceof Element) {
+							if (node.matches('.markdown-preview-view, .markdown-source-view')) {
+								observeContainer(node);
+							}
+							// Also check for nested containers
+							const nested = node.querySelectorAll('.markdown-preview-view, .markdown-source-view');
+							nested.forEach(n => observeContainer(n));
+						}
+					}
+				}
 			}
 		});
 
-		// Observe only direct children of body to reduce scope
-		// Elements must be added via MarkdownPostProcessor or direct DOM insertion
-		observer.observe(document.body, {
-			childList: true,
-			subtree: false,
-		});
-
-		// Clean up observer on unload
-		this.register(() => observer.disconnect());
+		containerObserver.observe(document.body, { childList: true, subtree: true });
+		this.register(() => containerObserver.disconnect());
 	}
 
 	private observeHeavyElements(): void {

@@ -2,8 +2,10 @@ import { MeasurementCache } from './MeasurementCache';
 import { FontInfo } from './utils/FontMetrics';
 import { logger } from './utils/logger';
 
-// Pretext type definitions (matching @chenglou/pretext API)
-type PreparedText = unknown;
+// Opaque type for PreparedText - Pretext internal data as black box
+// Prevents accidental passing of plain objects to rendering functions
+declare const __preparedTextBrand: unique symbol;
+type PreparedText = { readonly [__preparedTextBrand]: 'PreparedText' } | null;
 type LayoutResult = { height: number; lineCount: number };
 type LayoutLinesResult = LayoutResult & {
 	lines: Array<{ text: string; width: number; start: { segmentIndex: number; graphemeIndex: number }; end: { segmentIndex: number; graphemeIndex: number } }>;
@@ -32,16 +34,8 @@ export class PretextManager {
 	}
 
 	async initialize(): Promise<boolean> {
-		// Pretext bundle is loaded via styles.css injection
-		// Wait for the script to execute - use polling with timeout
-		const maxWait = 5000;
-		const checkInterval = 50;
-		const startTime = Date.now();
-
-		while (!window.Pretext && Date.now() - startTime < maxWait) {
-			await new Promise((resolve) => setTimeout(resolve, checkInterval));
-		}
-
+		// Pretext bundle is injected via inline script.textContent (synchronous execution)
+		// window.Pretext is available immediately after script is appended - no polling needed
 		if (window.Pretext) {
 			this.loaded = true;
 			logger.info('Pretext library loaded successfully.');
