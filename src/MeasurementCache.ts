@@ -10,14 +10,32 @@ type LayoutResult = { height: number; lineCount: number };
  	 return (hash >>> 0).toString(36);
  }
 
- export class MeasurementCache {
- 	 private cache: Map<string, { value: LayoutResult }>;
- 	 private maxSize: number;
+export class MeasurementCache {
+	private cache: Map<string, { value: LayoutResult }>;
+	private maxSize: number;
+	private hits = 0;
+	private misses = 0;
 
- 	 constructor(maxSize: number = 1000) {
- 	 	 this.cache = new Map();
- 	 	 this.maxSize = maxSize;
- 	 }
+	constructor(maxSize: number = 1000) {
+		this.cache = new Map();
+		this.maxSize = maxSize;
+	}
+
+	getStats(): { hits: number; misses: number; total: number; size: number } {
+		return {
+			hits: this.hits,
+			misses: this.misses,
+			total: this.hits + this.misses,
+			size: this.cache.size,
+		};
+	}
+
+	setMaxSize(size: number): void {
+		this.maxSize = size;
+		while (this.cache.size > this.maxSize) {
+			this.evictOldest();
+		}
+	}
 
  	 private makeKey(
  	 	 text: string,
@@ -44,28 +62,30 @@ type LayoutResult = { height: number; lineCount: number };
 		 return this.makeKey(text, fontFamily, fontSize, fontWeight, maxWidth, lineHeight);
 	 }
 
-	 get(
+get(
 		 textOrKey: string,
 		 fontFamily?: string,
 		 fontSize?: number,
 		 fontWeight?: number,
 		 maxWidth?: number,
 		 lineHeight?: number
- 	 ): LayoutResult | null {
+	): LayoutResult | null {
 		 const key = (fontFamily !== undefined && fontSize !== undefined && fontWeight !== undefined && maxWidth !== undefined && lineHeight !== undefined)
 			 ? this.makeKey(textOrKey, fontFamily, fontSize, fontWeight, maxWidth, lineHeight)
 			 : textOrKey;
- 	 	 const entry = this.cache.get(key);
+		 const entry = this.cache.get(key);
 
- 	 	 if (entry) {
- 	 	 	 // LRU O(1) 核心：命中缓存后，先删除再重新插入，将其推到 Map 的最后（最新）
- 	 	 	 this.cache.delete(key);
- 	 	 	 this.cache.set(key, entry);
- 	 	 	 return entry.value;
- 	 	 }
+		 if (entry) {
+			 this.hits++;
+			 // LRU O(1) 核心：命中缓存后，先删除再重新插入，将其推到 Map 的最后（最新）
+			 this.cache.delete(key);
+			 this.cache.set(key, entry);
+			 return entry.value;
+		 }
 
- 	 	 return null;
- 	 }
+		 this.misses++;
+		 return null;
+	}
 
  	 set(
 		 textOrKey: string,
@@ -108,9 +128,11 @@ type LayoutResult = { height: number; lineCount: number };
  	 	 }
  	 }
 
- 	 clear(): void {
- 	 	 this.cache.clear();
- 	 }
+clear(): void {
+		this.cache.clear();
+		this.hits = 0;
+		this.misses = 0;
+	}
 
  	 get size(): number {
  	 	 return this.cache.size;

@@ -4,14 +4,35 @@ import { MeasurementCache } from './src/MeasurementCache';
 import { createMarkdownPostProcessor } from './src/hooks/MarkdownPostProcessor';
 import { HEAVY_SELECTORS, processHeavyElement } from './src/hooks/HeavyElementOptimizer';
 import { createPretextCodeMirrorExtension } from './src/hooks/CodeMirrorExtension';
+import { createSettingsTab } from './src/hooks/SettingsTab';
 import { logger } from './src/utils/logger';
 
 // Pretext bundle is injected at build time
 declare const INJECT_PRETEXT_BUNDLE: string;
 
+/** Plugin settings */
+interface PluginSettings {
+	enablePreviewOptimization: boolean;
+	enableEditorOptimization: boolean;
+	minTextLength: number;
+	batchSize: number;
+	cacheSize: number;
+}
+
+const DEFAULT_SETTINGS: PluginSettings = {
+	enablePreviewOptimization: true,
+	enableEditorOptimization: true,
+	minTextLength: 50,
+	batchSize: 5,
+	cacheSize: 1000,
+};
+
 export default class ObsidianPretextPlugin extends Plugin {
-	private pretextManager!: PretextManager;
-	private measurementCache!: MeasurementCache;
+	public settings: PluginSettings = { ...DEFAULT_SETTINGS };
+	public pretextManager!: PretextManager;
+	public measurementCache!: MeasurementCache;
+	public elementsProcessedCount = 0;
+	public totalProcessingTime = 0;
 	private resizeObserver!: ResizeObserver;
 	private processingFlag = false;
 	// Throttle: RAF handle for observeHeavyElements
@@ -20,13 +41,14 @@ export default class ObsidianPretextPlugin extends Plugin {
 	private observedElements = new WeakSet<HTMLElement>();
 
 	async onload() {
+		await this.loadSettings();
+
 		logger.info('Loading plugin...');
 
 		// Load Pretext bundle (injected at build time)
 		this.loadPretextBundle();
 
-		// Initialize core modules
-		this.measurementCache = new MeasurementCache(1000);
+		// Initialize core modules (cache already created in loadSettings)
 		this.pretextManager = new PretextManager(this.measurementCache);
 		await this.pretextManager.initialize();
 
@@ -46,7 +68,19 @@ export default class ObsidianPretextPlugin extends Plugin {
 		// Initialize ResizeObserver for heavy elements
 		this.initializeResizeObserver();
 
+		// Register settings tab
+		this.addSettingTab(createSettingsTab(this.app, this));
+
 		logger.info('Plugin loaded successfully.');
+	}
+
+	private async loadSettings(): Promise<void> {
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		this.measurementCache = new MeasurementCache(this.settings.cacheSize);
+	}
+
+	async saveSettings(): Promise<void> {
+		await this.saveData(this.settings);
 	}
 
 	private loadPretextBundle(): void {
@@ -183,7 +217,7 @@ export default class ObsidianPretextPlugin extends Plugin {
 		this.register(() => containerObserver.disconnect());
 	}
 
-private observeHeavyElements(): void {
+	private observeHeavyElements(): void {
 		if (!this.resizeObserver || !this.pretextManager.isReady()) {
 			return;
 		}
@@ -207,35 +241,6 @@ private observeHeavyElements(): void {
 					this.resizeObserver.observe(el);
 				}
 			});
-		}
-	}
-
-		// Optimized: scan only visible content containers instead of whole document
-		const containers = document.querySelectorAll<HTMLElement>(
-			'.markdown-preview-view, .markdown-source-view, .mod-active'
-		);
-
-		if (containers.length === 0) {
-			return;
-		}
-
-		// Local scan: for each container, find heavy elements within it
-		for (const container of containers) {
-			for (const selector of HEAVY_SELECTORS) {
-				const elements = container.querySelectorAll<HTMLElement>(selector);
-				elements.forEach((el) => {
-					// Skip already optimized elements
-					if (el.hasAttribute('data-pretext-optimized')) {
-						return;
-					}
-					const currentWidth = el.clientWidth;
-					const previousWidth = parseFloat(el.getAttribute('data-pretext-width') || '0');
-
-					if (Math.abs(currentWidth - previousWidth) > 10) {
-						this.resizeObserver.observe(el);
-					}
-				});
-			}
 		}
 	}
 
