@@ -1,0 +1,89 @@
+version: 1
+plan:
+  name: 'obsidian-pretext 中等问题修复'
+  max_concurrency: 2
+  max_consecutive_failures: 2
+  max_cycles: 3
+tasks:
+  - id: codemirror-degradation
+    title: '增强 CodeMirror 降级提示'
+    prompt: |
+      增强 CodeMirror 扩展的降级处理，提供更明显的提示和更稳定的初始化。
+
+      **问题**：
+      - 当前依赖 `window.CodeMirror` 全局对象
+      - 失败时静默降级（只 console.warn），用户可能不知道优化没生效
+      - README 宣传的编辑器优化可能在很多 Obsidian 环境里没生效
+
+      **需要做的事情**：
+
+      1. 在 `src/hooks/CodeMirrorExtension.ts` 的降级处理中增强提示：
+      - 添加 console.group / console.groupEnd 让警告更醒目
+      - 添加 `data-pretext-cm` 属性检查，帮助用户诊断
+      - 考虑在降级时触发一次性的状态报告
+
+      2. 示例改进（当前代码约 line 42-44）：
+      ```typescript
+      if (!getCodeMirrorModules()) {
+          console.warn('[Pretext Optimizer] CodeMirror not available');
+          console.info('[Pretext Optimizer] Editor optimization disabled. This is expected in some Obsidian configurations.');
+          return null;
+      }
+      ```
+
+      3. 添加一个诊断方法 `getOptimizerStatus()` 返回优化状态：
+      ```typescript
+      export function getOptimizerStatus(): { enabled: boolean; reason?: string } {
+          if (getCodeMirrorModules() && EditorViewClass && DecorationClass && RangeSetBuilderClass) {
+              return { enabled: true };
+          }
+          return { enabled: false, reason: 'CodeMirror modules not available' };
+      }
+      ```
+
+      4. 运行 `npm test` 确保测试通过
+
+      工作目录：`D:\Obsidian\Obsidian Vault\.obsidian\plugins\obsidian-pretext`
+    assigned_to: coder
+    verified_by: verifier
+    verify_prompt: |
+      验证 CodeMirror 降级增强：
+      1. 运行 `npm test` 确认测试通过
+      2. 检查 `getOptimizerStatus()` 函数是否存在并导出
+      3. 检查降级提示是否更明显
+    timeout_ms: 600000
+
+  - id: cleanup-comments
+    title: '清理源码注释格式'
+    prompt: |
+      清理源码中的注释格式，统一风格，提高可维护性。
+
+      **问题**：多处注释格式不统一、冗余或风格不一致
+
+      **需要做的事情**：
+
+      1. 检查以下文件的注释质量：
+      - `src/MeasurementCache.ts` (line 30 附近)
+      - `src/PretextManager.ts`
+      - `src/hooks/HeavyElementOptimizer.ts`
+
+      2. 整理原则：
+      - 使用 JSDoc 风格（`/** */`）的标准函数/类文档
+      - 普通行注释用 `//`，不要用 `/* */` 多行注释做简单说明
+      - 移除显而易见的冗余注释（如 `// 增加 i`）
+      - 注释用英文或保持一致的简体中文
+      - 中文字符的 Unicode 转义（如 `\u3001`）旁边加上注释说明含义
+
+      3. 不要删除功能性的中文注释，只整理格式
+
+      4. 运行 `npm test` 确保测试通过
+
+      工作目录：`D:\Obsidian\Obsidian Vault\.obsidian\plugins\obsidian-pretext`
+    assigned_to: coder
+    verified_by: verifier
+    verify_prompt: |
+      验证注释清理：
+      1. 运行 `npm test` 确认测试通过
+      2. 抽样检查几个文件的注释格式是否更整洁
+      3. 确认没有引入新的格式问题
+    timeout_ms: 600000

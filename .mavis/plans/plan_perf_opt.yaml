@@ -1,0 +1,110 @@
+version: 1
+plan:
+  name: 'obsidian-pretext 三档性能优化'
+  max_concurrency: 2
+  max_consecutive_failures: 2
+  max_cycles: 8
+
+tasks:
+  # ===================== 第一优先级：收益最大 =====================
+
+  - id: 全局扫描改局部扫描
+    title: '全局扫描改局部扫描'
+    prompt: |
+      目标：把 MutationObserver 的全局扫描改成局部扫描。
+
+      当前问题：
+      - src/hooks/CodeMirrorExtension.ts 中的 observeHeavyElements()（约 line 85 附近）会调用 document.querySelectorAll(HEAVY_SELECTORS)，每次 DOM 变化都扫描整个页面。
+      - 应该只从 MutationObserver 的 addedNodes 往下找 .callout、blockquote、table td。
+
+      改动要求：
+      1. 在 CodeMirrorExtension.ts 中，把全局 querySelectorAll 改成遍历 addedNodes，对每个新节点用 querySelector 往下查找
+      2. 对 addedNodes 中的每个 Element，检查是否匹配 HEAVY_SELECTORS 并加入处理队列
+      3. 对已优化的元素跳过（data-pretext-optimized）
+      4. 保持现有的 getOptimizerStatus() 诊断功能
+      5. 测试：运行 npm test，确保 75 个测试通过
+
+      工作目录：D:\Obsidian\Obsidian Vault\.obsidian\plugins\obsidian-pretext
+      主要文件：src/hooks/CodeMirrorExtension.ts
+
+      完成后：
+      - 运行 npm test 并报告结果
+      - 运行 npm run build 并报告结果
+      - 写 deliverable.md 说明改动
+    assigned_to: coder
+    verified_by: verifier
+    verify_prompt: |
+      验证以下改动：
+      1. CodeMirrorExtension.ts 不再调用 document.querySelectorAll(HEAVY_SELECTORS) 全局扫描
+      2. 现在只从 addedNodes 往下找，不扫描整个 document
+      3. 已优化元素跳过（data-pretext-optimized 检查）
+      4. 保持 getOptimizerStatus() 诊断功能
+      5. 运行 npm test（应该全部通过）和 npm run build
+
+      工作目录：D:\Obsidian\Obsidian Vault\.obsidian\plugins\obsidian-pretext
+      检查 src/hooks/CodeMirrorExtension.ts 的改动是否符合需求。
+    timeout_ms: 1500000
+
+  - id: DOM变化节流
+    title: 'DOM 变化节流'
+    prompt: |
+      目标：给 observeHeavyElements() 加 requestAnimationFrame 节流，避免 Obsidian 连续触发多次时重复处理。
+
+      改动要求：
+      1. 用 requestAnimationFrame 包装 observeHeavyElements() 的实际调用
+      2. 保持一个 pending 状态，防止同一帧内多次触发
+      3. 与"全局扫描改局部扫描"任务并行开发，但独立验证
+      4. 确保节流不影响已优化的元素再次处理
+
+      工作目录：D:\Obsidian\Obsidian Vault\.obsidian\plugins\obsidian-pretext
+      主要文件：src/hooks/CodeMirrorExtension.ts
+
+      完成后：
+      - 运行 npm test 并报告结果
+      - 运行 npm run build 并报告结果
+      - 写 deliverable.md 说明改动
+    assigned_to: coder
+    verified_by: verifier
+    verify_prompt: |
+      验证节流实现：
+      1. 使用 requestAnimationFrame 包装
+      2. 防止同一帧内多次触发
+      3. 运行 npm test 和 npm run build
+      4. 检查节流逻辑不会跳过新增的重度元素
+
+      工作目录：D:\Obsidian\Obsidian Vault\.obsidian\plugins\obsidian-pretext
+    timeout_ms: 1500000
+
+  - id: 预览模式分批处理
+    title: '预览模式分批处理'
+    prompt: |
+      目标：把 MarkdownPostProcessor.ts 的同步处理改成 requestIdleCallback 分批处理。
+
+      当前问题：
+      - src/hooks/MarkdownPostProcessor.ts (line 13) 现在同步处理所有 heavy elements，打开长文时可能卡顿。
+
+      改动要求：
+      1. 参考 CodeMirrorExtension.ts line 148 的 requestIdleCallback 模式
+      2. 每批最多处理 5 个元素
+      3. 用 requestIdleCallback 分批，每批处理完后 schedule 下一批
+      4. 保持批量处理的顺序（先到先处理）
+      5. 确保 if (!pretextManager.isReady()) 提前退出逻辑不变
+
+      工作目录：D:\Obsidian\Obsidian Vault\.obsidian\plugins\obsidian-pretext
+      主要文件：src/hooks/MarkdownPostProcessor.ts
+
+      完成后：
+      - 运行 npm test 并报告结果
+      - 运行 npm run build 并报告结果
+      - 写 deliverable.md 说明改动
+    assigned_to: coder
+    verified_by: verifier
+    verify_prompt: |
+      验证分批处理实现：
+      1. 使用 requestIdleCallback 分批
+      2. 每批最多 5 个元素
+      3. 运行 npm test 和 npm run build
+      4. 检查批量处理顺序正确
+
+      工作目录：D:\Obsidian\Obsidian Vault\.obsidian\plugins\obsidian-pretext
+    timeout_ms: 1500000

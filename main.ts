@@ -165,15 +165,12 @@ export default class ObsidianPretextPlugin extends Plugin {
 					if (mutation.type === 'childList') {
 						for (const node of mutation.addedNodes) {
 							if (node instanceof Element) {
-								for (const selector of HEAVY_SELECTORS) {
-									if (node.matches(selector)) {
-										newHeavyElements.push(node as HTMLElement);
-									}
+								const combinedSelector = HEAVY_SELECTORS.join(', ');
+								if (node.matches(combinedSelector)) {
+									newHeavyElements.push(node as HTMLElement);
 								}
-								for (const selector of HEAVY_SELECTORS) {
-									const matches = node.querySelectorAll<HTMLElement>(selector);
-									matches.forEach(el => newHeavyElements.push(el));
-								}
+								const matches = node.querySelectorAll<HTMLElement>(combinedSelector);
+								matches.forEach(el => newHeavyElements.push(el));
 							}
 						}
 					}
@@ -223,25 +220,24 @@ export default class ObsidianPretextPlugin extends Plugin {
 		}
 
 		// Find and observe heavy elements
-		for (const selector of HEAVY_SELECTORS) {
-			const elements = document.querySelectorAll<HTMLElement>(selector);
-			elements.forEach((el) => {
-				// Skip if already observed to avoid duplicate ResizeObserver entries
-				if (this.observedElements.has(el)) {
-					return;
-				}
-				// Observe elements that need optimization (not yet optimized or width changed)
-				// We observe ALL matching elements, not just optimized ones, to catch new elements
-				const currentWidth = el.clientWidth;
-				const previousWidth = parseFloat(el.getAttribute('data-pretext-width') || '0');
+		const combinedSelector = HEAVY_SELECTORS.join(', ');
+		const elements = document.querySelectorAll<HTMLElement>(combinedSelector);
+		elements.forEach((el) => {
+			// Skip if already observed to avoid duplicate ResizeObserver entries
+			if (this.observedElements.has(el)) {
+				return;
+			}
+			// Observe elements that need optimization (not yet optimized or width changed)
+			// We observe ALL matching elements, not just optimized ones, to catch new elements
+			const currentWidth = el.clientWidth;
+			const previousWidth = parseFloat(el.getAttribute('data-pretext-width') || '0');
 
-				if (!el.hasAttribute('data-pretext-optimized') ||
-					Math.abs(currentWidth - previousWidth) > 10) {
-					this.observedElements.add(el);
-					this.resizeObserver.observe(el);
-				}
-			});
-		}
+			if (!el.hasAttribute('data-pretext-optimized') ||
+				Math.abs(currentWidth - previousWidth) > 10) {
+				this.observedElements.add(el);
+				this.resizeObserver.observe(el);
+			}
+		});
 	}
 
 	/**

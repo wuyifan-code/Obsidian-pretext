@@ -1,0 +1,109 @@
+version: 1
+plan:
+  name: 'obsidian-pretext 严重问题修复'
+  max_concurrency: 2
+  max_consecutive_failures: 2
+  max_cycles: 3
+tasks:
+  - id: lineheight-fix
+    title: '修复 lineHeight 单位错误'
+    prompt: |
+      修复 Pretext layout() 调用中 lineHeight 参数单位错误的问题。
+
+      **问题根因**：
+      Pretext 的 `layout(prepared, maxWidth, lineHeight)` 在 `lib/pretext/layout.js:306` 计算 `height = lineCount * lineHeight`，其中 `lineHeight` 期望是像素值。
+      但插件在两处把像素值除以字号变成了无单位比例值（1.5这种），导致 `min-height` 只有几像素，核心性能优化完全失效。
+
+      **需要修改的位置**：
+
+      1. `src/hooks/HeavyElementOptimizer.ts` (约 line 34)
+      当前代码：
+      ```typescript
+      const lineHeightUnit = font.lineHeight / font.fontSize;
+      ```
+      应改为直接传像素值：
+      ```typescript
+      const lineHeightPx = font.lineHeight; // 直接用像素值，不要除字号
+      ```
+      并更新后续使用 `lineHeightUnit` 的地方（line 43, 59, 71）为 `lineHeightPx`。
+
+      2. `src/hooks/CodeMirrorExtension.ts` (约 line 104)
+      当前代码：
+      ```typescript
+      const lineHeightUnit = this.fontInfo.lineHeight / this.fontInfo.fontSize;
+      ```
+      应改为：
+      ```typescript
+      const lineHeightPx = this.fontInfo.lineHeight;
+      ```
+      并更新后续使用 `lineHeightUnit` 的地方（line 118）为 `lineHeightPx`。
+
+      **验证**：修改后运行 `npm test` 确保测试通过。
+
+      工作目录：`D:\Obsidian\Obsidian Vault\.obsidian\plugins\obsidian-pretext`
+    assigned_to: coder
+    verified_by: verifier
+    verify_prompt: |
+      验证 lineHeight 修复：
+      1. 运行 `npm test` 确认 75 个测试通过
+      2. 检查 HeavyElementOptimizer.ts 和 CodeMirrorExtension.ts 中 lineHeight 相关代码
+      3. 确认传的是像素值而不是比例值
+    timeout_ms: 600000
+
+  - id: typecheck-fix
+    title: '修复 typecheck 失败'
+    prompt: |
+      修复 npm run typecheck 失败的问题，添加缺失的类型声明。
+
+      **问题**：
+      - 缺少 `@types/obsidian` 类型声明
+      - `lib/pretext/layout.js` 没有 .d.ts 声明文件
+
+      **需要做的事情**：
+
+      1. 在 `package.json` 的 devDependencies 中添加：
+      ```json
+      "@types/obsidian": "latest"
+      ```
+      然后运行 `npm install` 安装依赖。
+
+      2. 为 `lib/pretext/layout.js` 创建类型声明文件 `lib/pretext/layout.d.ts`：
+      ```typescript
+      export interface PreparedText {
+        // 内部数据结构，由 prepare() 返回
+      }
+
+      export interface LayoutResult {
+        lineCount: number;
+        height: number;
+      }
+
+      /**
+       * 计算文本布局
+       * @param prepared - prepare() 返回的准备好的文本
+       * @param maxWidth - 最大宽度（像素）
+       * @param lineHeight - 行高（像素）
+       * @returns 包含行数和总高度的布局结果
+       */
+      export function layout(prepared: PreparedText, maxWidth: number, lineHeight: number): LayoutResult;
+
+      /**
+       * 准备文本进行布局计算
+       * @param text - 要计算的文本
+       * @param font - 字体信息
+       * @returns 准备好的文本对象
+       */
+      export function prepare(text: string, font: { fontFamily: string; fontSize: number; fontWeight?: number; lineHeight: number }): PreparedText | null;
+      ```
+
+      **验证**：运行 `npm run typecheck` 确认没有错误。
+
+      工作目录：`D:\Obsidian\Obsidian Vault\.obsidian\plugins\obsidian-pretext`
+    assigned_to: coder
+    verified_by: verifier
+    verify_prompt: |
+      验证 typecheck 修复：
+      1. 检查 package.json 是否有 @types/obsidian
+      2. 检查 lib/pretext/ 目录是否有 layout.d.ts
+      3. 运行 `npm run typecheck` 确认无错误
+    timeout_ms: 600000

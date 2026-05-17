@@ -1,15 +1,5 @@
 type LayoutResult = { height: number; lineCount: number };
 
- // Simple FNV-1a hash for cache keys
- function hashString(str: string): string {
- 	 let hash = 2166136261;
- 	 for (let i = 0; i < str.length; i++) {
- 	 	 hash ^= str.charCodeAt(i);
- 	 	 hash = Math.imul(hash, 16777619);
- 	 }
- 	 return (hash >>> 0).toString(36);
- }
-
 export class MeasurementCache {
 	private cache: Map<string, { value: LayoutResult }>;
 	private maxSize: number;
@@ -45,10 +35,7 @@ export class MeasurementCache {
  	 	 maxWidth: number,
  	 	 lineHeight: number
  	 ): string {
- 	 	 // 建议直接使用文本原文，避免哈希碰撞（如果文本很长可考虑哈希）
- 	 	 // 这里为了性能保留哈希，但风险由开发者承担
- 	 	 const textHash = hashString(text);
- 	 	 return `${textHash}:${fontFamily}:${fontSize}:${fontWeight}:${maxWidth}:${lineHeight}`;
+ 	 	 return `${text}:${fontFamily}:${fontSize}:${fontWeight}:${maxWidth}:${lineHeight}`;
  	 }
 
 	 getCacheKey(

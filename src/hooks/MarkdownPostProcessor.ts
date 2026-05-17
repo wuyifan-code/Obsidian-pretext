@@ -14,10 +14,9 @@ export function createMarkdownPostProcessor(pretextManager: PretextManager, cach
 
 		// Collect all heavy elements under this root element
 		const allHeavyEls: HTMLElement[] = [];
-		for (const selector of HEAVY_SELECTORS) {
-			const heavyEls = element.querySelectorAll<HTMLElement>(selector);
-			heavyEls.forEach((el) => allHeavyEls.push(el));
-		}
+		const combinedSelector = HEAVY_SELECTORS.join(', ');
+		const heavyEls = element.querySelectorAll<HTMLElement>(combinedSelector);
+		heavyEls.forEach((el) => allHeavyEls.push(el));
 
 		// Process in batches using requestIdleCallback
 		let index = 0;

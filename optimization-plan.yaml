@@ -1,0 +1,104 @@
+version: 1
+plan:
+  name: 'obsidian-pretext 性能优化第三阶段'
+  max_concurrency: 4
+  max_consecutive_failures: 2
+  max_cycles: 3
+tasks:
+  - id: wordlike-optimization
+    title: 'isWordLike 数组优化为 Uint8Array'
+    prompt: |
+      将 `src/analysis/segmentation.ts` 中的 `mergedWordLike: boolean[]` 改为 `mergedWordLike: Uint8Array`。
+      
+      修改点：
+      1. 预分配：`const mergedWordLike: Uint8Array = new Uint8Array(estimatedCapacity);`
+      2. 写入：`mergedWordLike[mergedLen] = piece.isWordLike ? 1 : 0;`
+      3. 读取比较：使用 `mergedWordLike[mergedLen - 1] === 1` 替代 `mergedWordLike[mergedLen - 1]`
+      4. 需要更新 `SegmentationResult` 接口定义
+      5. 更新 `buildSegmentationResult` 函数
+      6. 更新 `punctuation.ts` 中的 `mergeGlueConnectedTextRuns` 函数
+      7. 运行 `npm test` 确保所有测试通过
+      
+      工作目录：`D:\Obsidian\Obsidian Vault\.obsidian\plugins\obsidian-pretext`
+    assigned_to: coder
+    verified_by: verifier
+    verify_prompt: |
+      运行 `npm test` 确认所有 75 个测试通过。检查：
+      1. 测试通过率 100%
+      2. 没有类型错误
+      3. 修改后的代码逻辑与之前一致
+    timeout_ms: 600000
+
+  - id: arabic-punctuation-inlining
+    title: '阿拉伯语标点处理函数内联'
+    prompt: |
+      将 `src/analysis/segmentation.ts` 中的 `endsWithArabicNoSpacePunctuation` 调用内联到分词循环中。
+      
+      当前代码：
+      ```typescript
+      if (piece.isWordLike &&
+          currentDependencies.containsArabicScript(piece.text) &&
+          currentDependencies.endsWithArabicNoSpacePunctuation(prevText)
+      )
+      ```
+      
+      需要内联 `endsWithArabicNoSpacePunctuation` 的逻辑：
+      - 检查 prevText 是否包含阿拉伯语脚本
+      - 检查 prevText 最后一个字符是否在 `/:./\u060C/\u061B` 中
+      
+      内联后的代码应该直接使用字符码点比较，避免函数调用开销。
+      
+      工作目录：`D:\Obsidian\Obsidian Vault\.obsidian\plugins\obsidian-pretext`
+    assigned_to: coder
+    verified_by: verifier
+    verify_prompt: |
+      运行 `npm test` 确认所有测试通过。检查：
+      1. 阿拉伯语相关文本的分词结果正确
+      2. 标点粘连逻辑没有被破坏
+    timeout_ms: 600000
+
+  - id: ends-with-closing-quote-inlining
+    title: 'endsWithClosingQuote 函数内联'
+    prompt: |
+      将 `endsWithClosingQuote` 调用内联到分词循环中，减少函数调用开销。
+      
+      当前 `punctuation.ts` 中的实现遍历字符串从后往前找 closing quote。
+      需要内联这个逻辑到 `segmentation.ts` 的分词循环中。
+      
+      closing quote 字符集包括：`\u201C \u2018 \u00AB \u2039 \u300D \u300F \u3011 \u300B \u3009 \u3015 \uFF09`
+      
+      工作目录：`D:\Obsidian\Obsidian Vault\.obsidian\plugins\obsidian-pretext`
+    assigned_to: coder
+    verified_by: verifier
+    verify_prompt: |
+      运行 `npm test` 确认所有测试通过。检查：
+      1. CJK 引号后的文字合并逻辑正确
+      2. 引号粘连测试用例通过
+    timeout_ms: 600000
+
+  - id: performance-benchmark
+    title: '性能基准测试验证'
+    prompt: |
+      运行性能测试并生成报告。
+      
+      执行命令：`npm test -- src/analysis/__tests__/performance.test.ts`
+      
+      收集以下数据点：
+      - 短文本 (100字符) 平均耗时
+      - CJK短文本 (100字符) 平均耗时
+      - 中等文本 (1000字符) 平均耗时
+      - 长文本 (5000字符) 平均耗时
+      - 100次短文本处理总耗时
+      - 50次中等文本处理总耗时
+      
+      输出格式：表格形式展示所有指标
+      
+      工作目录：`D:\Obsidian\Obsidian Vault\.obsidian\plugins\obsidian-pretext`
+    assigned_to: verifier
+    verified_by: verifier
+    verify_prompt: |
+      验证性能测试输出的数据合理性：
+      1. 所有测试场景的耗时应该在合理范围内
+      2. 长文本处理不应超过 10ms
+      3. 与之前测试结果对比，确认没有性能退化
+    timeout_ms: 300000
