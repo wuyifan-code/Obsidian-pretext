@@ -1,5 +1,5 @@
-import { App, PluginSettingsTab, Setting } from 'obsidian';
-import type ObsidianPretextPlugin from '../main';
+import { App, PluginSettingTab, Setting } from 'obsidian';
+import type ObsidianPretextPlugin from '../../main';
 import { invalidateFontCache } from '../utils/FontMetrics';
 
 /** Stats exposed for display in settings */
@@ -10,8 +10,8 @@ export interface OptimizerStats {
 	totalProcessingTime: number; // ms
 }
 
-export function createSettingsTab(app: App, plugin: ObsidianPretextPlugin): PluginSettingsTab {
-	return new (class extends PluginSettingsTab {
+export function createSettingsTab(app: App, plugin: ObsidianPretextPlugin): PluginSettingTab {
+	return new (class extends PluginSettingTab {
 		private stats: OptimizerStats = {
 			cacheHits: 0,
 			cacheMisses: 0,
@@ -140,7 +140,7 @@ export function createSettingsTab(app: App, plugin: ObsidianPretextPlugin): Plug
 			refreshStats();
 			// Auto-refresh every 2 seconds
 			const intervalId = setInterval(refreshStats, 2000);
-			this.plugin.register(() => clearInterval(intervalId));
+			plugin.register(() => clearInterval(intervalId));
 
 			new Setting(containerEl)
 				.addButton(button => button

@@ -1,6 +1,6 @@
-# Obsidian Pretext
+# Pretext Optimizer
 
-> 减少 Obsidian 渲染时的 DOM 测量开销，提升大型文档的渲染性能。
+> 减少渲染时的 DOM 测量开销，提升大型文档的渲染性能。
 
 **版本**: 1.2.0 | **要求**: Obsidian 1.10+
 
@@ -38,7 +38,7 @@
 ### 手动
 
 1. 下载最新 release
-2. 解压到 `.obsidian/plugins/obsidian-pretext/`
+2. 解压到 `.obsidian/plugins/pretext-optimizer/`
 3. 重启 Obsidian，启用插件
 
 ## 开发
@@ -74,7 +74,7 @@ src/
 
 ## 许可证
 
-ISC License. Pretext 框架采用 MIT License。
+MIT License。
 
 ---
 
