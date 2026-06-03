@@ -1,0 +1,99 @@
+version: 1
+plan:
+  name: 'obsidian-pretext Tier 1 收尾：初始扫描改局部 + 验证'
+  max_concurrency: 4
+  max_consecutive_failures: 2
+  max_cycles: 3
+  verifier_config:
+    default_verifiers: [verifier]
+    audit_sample_rate: 0.0
+tasks:
+  - id: tier1-local-scan-fix
+    title: 'observeHeavyElements 改按容器局部扫描 + 测试构建验证'
+    prompt: |
+      ## Goal
+      修复 Obsidian Pretext 插件启动时 `observeHeavyElements()` 仍然做 `document.querySelectorAll` 全局扫描的遗留问题。这一步是 Tier 1 性能优化的最后一个口子。
+      
+      ## Context
+      - 工作目录（项目根）：`D:\Obsidian\Obsidian Vault\.obsidian\plugins\obsidian-pretext`
+      - 当前分支：master，最近一个 commit `e125c26`
+      - 仓库是一个 git 项目，**必须在 worktree 里干活**（主 checkout 不能动）
+      - 改动文件：`main.ts`，函数 `observeHeavyElements()` 在 line 217-241
+      - 现有 line 224：`const elements = document.querySelectorAll<HTMLElement>(combinedSelector);`（**全文档扫**）
+      - 目标行为：scope 到 `.markdown-preview-view, .markdown-source-view, .mod-active` 三个容器
+      - 同项目 `setupViewObservers()`（line 158-215）已经在用这套容器约定，是参考实现
+      - 项目 build 用 esbuild（`build.js`），test 用 vitest，typecheck 用 `tsc --noEmit`
+      
+      ## Steps
+      1. **建 worktree**（用 `worktree-management` skill）
+         - `git fetch origin`
+         - 从 `origin/master` 切 `fix/observe-heavy-elements-local-scan` 分支
+         - worktree 路径：`$PROJECT_ROOT/.worktrees/fix-observe-heavy-elements-local-scan`
+         - 进 worktree 后 `npm install`（确认依赖齐全，可跳过如果 node_modules 已经存在）
+      2. **改 main.ts 的 `observeHeavyElements()`**
+         - 容器选择器：`.markdown-preview-view, .markdown-source-view, .mod-active`
+         - 改成先找容器，再在每个容器内 `querySelectorAll(combinedSelector)`，合并去重
+         - 同一元素如果在多个容器里出现（比如嵌入场景），只处理一次（用 `Set<HTMLElement>` 去重，**不要**为了去重把元素加到 `observedElements` WeakSet 两次——该 WeakSet 是 ResizeObserver 去重用的，**保持原语义**：仅当真的要 `resizeObserver.observe(el)` 时再 add）
+         - 保留 `el.hasAttribute('data-pretext-optimized')` 跳过逻辑
+         - 保留 `Math.abs(currentWidth - previousWidth) > 10` width-change 检查
+      3. **跑验证**（三个命令都必须绿）
+         - `npm test`（项目当前 75 个测试，100% 通过）
+         - `npm run build`（生成 main.js）
+         - `npm run typecheck`（无类型错误）
+      4. **写 `deliverable.md`** 在 worktree 根目录，包含：
+         - 改动文件 + 行号（diff 简述）
+         - 关键代码：改动前 vs 改动后（5-15 行）
+         - 三个命令输出末尾行（`Tests: X passed` / `build OK` / `typecheck OK` 之类）
+         - 提交 hash
+      5. **提交改动**（不要 push，不要合并到 master）：
+         - `git add main.ts deliverable.md`
+         - `git commit -m "fix(perf): scope observeHeavyElements to markdown containers (avoid full document scan)"`
+      6. **回报给 orchestrator**：
+         - worktree 绝对路径
+         - 提交 hash
+         - deliverable.md 的内容（直接贴在最终消息里）
+      
+      ## Hard Constraints
+      - ❌ 不要修改 `setupViewObservers()`、`MarkdownPostProcessor.ts`、`HeavyElementOptimizer.ts`、`FontMetrics.ts`（这些已经达标）
+      - ❌ 不要改 `HEAVY_SELECTORS` 列表本身
+      - ❌ 不要加新依赖或改 `package.json` 的 scripts
+      - ❌ 不要 push、不要 merge、不要改 master
+      - ❌ 不要在主 checkout 改任何文件
+      - ✅ 如果 `npm test` / `npm run build` 失败，先修代码再提交，**不要提交一个红测试**
+      - ✅ 改动只动 main.ts 一个文件 + 新增 deliverable.md
+    assigned_to: coder
+    verified_by: verifier
+    verify_prompt: |
+      独立验证 `fix/observe-heavy-elements-local-scan` 分支上的改动。**不要**只读 diff 走个过场，必须自己跑命令。
+      
+      进入 coder 提供的 worktree 路径（**不是**主仓库目录）。
+      
+      ## 必做验证（每步都要有证据）
+      1. `cat main.ts`，肉眼读 `observeHeavyElements()` 实际代码
+      2. **用 ripgrep 独立确认**：
+         - `rg "document\.querySelectorAll" main.ts` — 确认 `observeHeavyElements()` 函数体内**没有** `document.querySelectorAll(combinedSelector)` 这种全文档扫
+         - `rg "markdown-preview-view.*markdown-source-view.*mod-active" main.ts` — 确认三个容器选择器在该函数里出现
+         - 容器选择器在 main.ts 里只出现在 `setupViewObservers()`（局部容器列表更长）、`containerObserver`（line ~196）、和你新加的 `observeHeavyElements()` 中
+      3. **独立跑命令**（不要相信 coder 报告）：
+         - `npm test` — 100% 通过
+         - `npm run build` — main.js 生成
+         - `npm run typecheck` — 无错误
+      4. **审查 dedup 逻辑**：
+         - 同一元素被多容器包含时会被多次 process 吗？正确吗？
+         - `observedElements` WeakSet 的语义有没有被改坏？它只是 ResizeObserver 的去重
+         - 用 Set 去重时，Set 对 HTMLElement 的引用是强引用——会不会泄漏？要不要换 WeakSet？
+      5. **攻击式测试**：
+         - 函数入口没拿到容器时（初始化早期）会不会 NPE？
+         - detached 元素行为正确吗？
+         - 容器是 `.mod-active` 之外的（普通 .markdown-*-view 但没 active）能命中吗？
+      6. **回归检查**：
+         - `git diff origin/master..HEAD --stat` — 改动只动 main.ts + deliverable.md
+         - `git diff origin/master..HEAD -- main.ts` — diff 干净，没有意外波及
+         - `git log -1 --format='%an %ae'` — 提交作者
+      7. **检查 deliverable.md** — 是否包含 diff 简述 + 命令输出 + 提交 hash
+      
+      ## 报告格式
+      - 第一行：**PASS** 或 **FAIL**
+      - 失败时：哪个步骤失败、命令输出关键行、期望 vs 实际、建议修复方向
+      - 成功时：commit hash + 三个命令的最终一行输出 + 一句话总结
+    timeout_ms: 1500000
