@@ -6,7 +6,14 @@ import { HEAVY_SELECTORS, processHeavyElement } from './HeavyElementOptimizer';
 /** Max elements to process per batch */
 const BATCH_SIZE = 5;
 
-export function createMarkdownPostProcessor(pretextManager: PretextManager, cache: MeasurementCache): MarkdownPostProcessor {
+/** Optional callback fired after each element is processed (cache hit or miss). */
+export type ProcessedCallback = (elapsedMs: number, cacheHit: boolean) => void;
+
+export function createMarkdownPostProcessor(
+	pretextManager: PretextManager,
+	cache: MeasurementCache,
+	onProcessed?: ProcessedCallback
+): MarkdownPostProcessor {
 	return (element: HTMLElement, context: any) => {
 		if (!pretextManager.isReady()) {
 			return;
@@ -24,7 +31,7 @@ export function createMarkdownPostProcessor(pretextManager: PretextManager, cach
 		function processBatch(deadline: IdleDeadline) {
 			while (index < allHeavyEls.length && deadline.timeRemaining() > 2) {
 				const el = allHeavyEls[index++];
-				processHeavyElement(el, pretextManager, cache);
+				processHeavyElement(el, pretextManager, cache, undefined, onProcessed);
 			}
 
 			if (index < allHeavyEls.length) {
@@ -41,7 +48,7 @@ export function createMarkdownPostProcessor(pretextManager: PretextManager, cach
 				(window as any).requestIdleCallback(processBatch);
 			} else {
 				// Fallback: process synchronously if requestIdleCallback not available
-				allHeavyEls.forEach((el) => processHeavyElement(el, pretextManager, cache));
+				allHeavyEls.forEach((el) => processHeavyElement(el, pretextManager, cache, undefined, onProcessed));
 			}
 		}
 	};

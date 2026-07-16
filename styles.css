@@ -1,6 +1,10 @@
 /* Pretext Optimizer - Minimal Styles */
 
+/* `contain: layout` tells the browser that the optimized element's intrinsic
+   size is independent of its descendants, so the engine can skip subtree
+   reflow when our `min-height` is applied. This replaces the previous
+   `transition: min-height` rule, which forced a 100ms animation on every
+   heavy element during document open and hurt scroll responsiveness. */
 [data-pretext-optimized] {
-	/* Smooth transition when height is applied */
-	transition: min-height 0.1s ease-out;
+	contain: layout;
 }

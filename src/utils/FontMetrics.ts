@@ -9,14 +9,33 @@ export interface FontInfo {
 const fontInfoCache = new WeakMap<HTMLElement, FontInfo>();
 /** Cache for container widths per element. */
 const containerWidthCache = new WeakMap<HTMLElement, number>();
-/** Invalidation flag — set true on resize or theme change. */
+/** Invalidation flag — set true on resize or theme change, reset on next frame. */
 let cacheInvalidated = false;
+let resetRafId: number | null = null;
+
+/**
+ * Invalidate the cache and schedule a re-arm on the next animation frame.
+ * The previous implementation set `cacheInvalidated = true` on resize but never
+ * reset it, which meant every element paid the getComputedStyle cost on every
+ * lookup for the rest of the session. We now use a RAF debounce so a window
+ * resize (which fires many events in quick succession) collapses into a single
+ * "rebuild the cache lazily" point.
+ */
+function invalidateCaches(): void {
+	cacheInvalidated = true;
+	if (resetRafId !== null) return;
+	const schedule = typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function'
+		? window.requestAnimationFrame.bind(window)
+		: (cb: FrameRequestCallback) => window.setTimeout(() => cb(performance.now()), 16);
+	resetRafId = schedule(() => {
+		resetRafId = null;
+		cacheInvalidated = false;
+	});
+}
 
 // Invalidate on window resize
 if (typeof window !== 'undefined') {
-	window.addEventListener('resize', () => {
-		cacheInvalidated = true;
-	});
+	window.addEventListener('resize', invalidateCaches);
 }
 
 /**
@@ -77,5 +96,5 @@ export function getContainerWidth(el: HTMLElement): number {
  * Invalidate font and width caches. Call after theme changes.
  */
 export function invalidateFontCache(): void {
-	cacheInvalidated = true;
+	invalidateCaches();
 }

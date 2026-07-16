@@ -13,7 +13,13 @@ export const HEAVY_SELECTORS = [
 ];
 
 // 直接导出处理函数供 main.ts 调度
-export function processHeavyElement(el: HTMLElement, pretextManager: PretextManager, cache: MeasurementCache, forceWidth?: number): void {
+export function processHeavyElement(
+	el: HTMLElement,
+	pretextManager: PretextManager,
+	cache: MeasurementCache,
+	forceWidth?: number,
+	onProcessed?: (elapsedMs: number, cacheHit: boolean) => void
+): void {
 	// 移除早期退出的限制，允许传入 forceWidth 时强制触发更新
 	if (!forceWidth && el.hasAttribute('data-pretext-optimized')) {
 		return;
@@ -47,10 +53,12 @@ export function processHeavyElement(el: HTMLElement, pretextManager: PretextMana
 		el.style.minHeight = `${cached.height}px`;
 		el.setAttribute('data-pretext-optimized', 'cached');
 		el.setAttribute('data-pretext-width', String(maxWidth)); // 记录当前测量的宽度供 Observer 对比
+		if (onProcessed) onProcessed(0, true);
 		return;
 	}
 
 	// Prepare and layout with Pretext
+	const startMark = (typeof performance !== 'undefined' ? performance.now() : Date.now());
 	const prepared = pretextManager.prepare(text, font);
 	if (!prepared) {
 		return;
@@ -69,4 +77,9 @@ export function processHeavyElement(el: HTMLElement, pretextManager: PretextMana
 	el.setAttribute('data-pretext-optimized', 'true');
 	el.setAttribute('data-pretext-lines', String(layout.lineCount));
 	el.setAttribute('data-pretext-width', String(maxWidth)); // 记录当前测量的宽度供 Observer 对比
+
+	if (onProcessed) {
+		const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+		onProcessed(now - startMark, false);
+	}
 }

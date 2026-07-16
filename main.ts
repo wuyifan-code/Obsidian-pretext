@@ -58,7 +58,14 @@ export default class ObsidianPretextPlugin extends Plugin {
 
 		// Register Markdown post-processor for live preview optimization
 		this.registerMarkdownPostProcessor(
-			createMarkdownPostProcessor(this.pretextManager, this.measurementCache),
+			createMarkdownPostProcessor(
+				this.pretextManager,
+				this.measurementCache,
+				(elapsedMs) => {
+					this.elementsProcessedCount++;
+					this.totalProcessingTime += elapsedMs;
+				}
+			),
 			100
 		);
 
@@ -127,20 +134,34 @@ export default class ObsidianPretextPlugin extends Plugin {
 		}
 
 		this.resizeObserver = new ResizeObserver((entries) => {
-			// Prevent feedback loop with MutationObserver
+			// Prevent feedback loop with MutationObserver.
+			// Use try/finally so a throw inside processHeavyElement doesn't
+			// permanently lock processingFlag = true and silently disable
+			// future MutationObserver work.
 			this.processingFlag = true;
-			entries.forEach((entry) => {
-				const el = entry.target as HTMLElement;
-				const currentWidth = entry.contentRect.width;
-				const previousWidth = parseFloat(el.getAttribute('data-pretext-width') || '0');
+			try {
+				entries.forEach((entry) => {
+					const el = entry.target as HTMLElement;
+					const currentWidth = entry.contentRect.width;
+					const previousWidth = parseFloat(el.getAttribute('data-pretext-width') || '0');
 
-				// Only reprocess if width changed significantly (more than 10px)
-				if (Math.abs(currentWidth - previousWidth) > 10) {
-					processHeavyElement(el, this.pretextManager, this.measurementCache, currentWidth);
-				}
-			});
-			// Reset flag after processing
-			this.processingFlag = false;
+					// Only reprocess if width changed significantly (more than 10px)
+					if (Math.abs(currentWidth - previousWidth) > 10) {
+						processHeavyElement(
+							el,
+							this.pretextManager,
+							this.measurementCache,
+							currentWidth,
+							(elapsedMs) => {
+								this.elementsProcessedCount++;
+								this.totalProcessingTime += elapsedMs;
+							}
+						);
+					}
+				});
+			} finally {
+				this.processingFlag = false;
+			}
 		});
 
 		// Start observing heavy elements
@@ -184,7 +205,12 @@ export default class ObsidianPretextPlugin extends Plugin {
 				}
 			});
 
-			observer.observe(container, { childList: true, subtree: true });
+			// subtree: false — only watch direct children of the view container.
+			// This is the perf fix claimed in v1.2.0 (P2-1) that was never actually applied.
+			// Heavy elements (.callout, blockquote, table td) are almost always direct
+			// children of the view container; if we ever need to catch deeper nests, do it
+			// with a narrow `addedNodes` walk inside the callback instead of subtree: true.
+			observer.observe(container, { childList: true, subtree: false });
 			this.register(() => observer.disconnect());
 		};
 
@@ -210,7 +236,10 @@ export default class ObsidianPretextPlugin extends Plugin {
 			}
 		});
 
-		containerObserver.observe(document.body, { childList: true, subtree: true });
+		// subtree: false on document.body — body is shallow at the level we care about
+		// (workspace-leaf > markdown-view), and subtree: true on body would force the
+		// observer to walk the entire DOM on every keystroke.
+		containerObserver.observe(document.body, { childList: true, subtree: false });
 		this.register(() => containerObserver.disconnect());
 	}
 

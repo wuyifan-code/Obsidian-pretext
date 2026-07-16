@@ -1,6 +1,6 @@
 {
   "name": "pretext-optimizer",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Integrates Pretext library to reduce DOM measurement overhead in the rendering pipeline",
   "main": "main.js",
   "scripts": {
