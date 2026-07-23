@@ -2,6 +2,15 @@
 
 All notable changes to this plugin will be documented in this file.
 
+## [1.2.2] - 2026-07-23
+
+### Fixed
+
+- Match the existing community listing ID, `obsidian-pretext`.
+- Bundle Pretext through static module imports instead of injecting a runtime script element.
+- Use CSS classes for settings statistics styling.
+- Remove unsupported ESLint suppression directives.
+
 ## [1.2.1] - 2026-07-16
 
 ### Fixed

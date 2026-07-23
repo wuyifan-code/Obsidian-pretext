@@ -132,8 +132,8 @@ export function createSettingsTab(app: App, plugin: ObsidianPretextPlugin): Plug
 				const table = statsEl.createEl('table');
 				for (const [key, value] of rows) {
 					const tr = table.createEl('tr');
-					tr.createEl('td', { text: key }).style.fontWeight = '600';
-					tr.createEl('td', { text: value }).style.textAlign = 'right';
+					tr.createEl('td', { text: key, cls: 'pretext-stat-label' });
+					tr.createEl('td', { text: value, cls: 'pretext-stat-value' });
 				}
 			};
 

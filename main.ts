@@ -7,9 +7,6 @@ import { createPretextCodeMirrorExtension } from './src/hooks/CodeMirrorExtensio
 import { createSettingsTab } from './src/hooks/SettingsTab';
 import { logger } from './src/utils/logger';
 
-// Pretext bundle is injected at build time
-declare const INJECT_PRETEXT_BUNDLE: string;
-
 /** Plugin settings */
 interface PluginSettings {
 	enablePreviewOptimization: boolean;
@@ -44,9 +41,6 @@ export default class ObsidianPretextPlugin extends Plugin {
 		await this.loadSettings();
 
 		logger.info('Loading plugin...');
-
-		// Load Pretext bundle (injected at build time)
-		this.loadPretextBundle();
 
 		// Initialize core modules (cache already created in loadSettings)
 		this.pretextManager = new PretextManager(this.measurementCache);
@@ -88,27 +82,6 @@ export default class ObsidianPretextPlugin extends Plugin {
 
 	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
-	}
-
-	private loadPretextBundle(): void {
-		if ((window as any).Pretext) {
-			logger.info('Pretext already available.');
-			return;
-		}
-
-		try {
-			const script = document.createElement('script');
-			script.textContent = INJECT_PRETEXT_BUNDLE;
-			document.head.appendChild(script);
-
-			if ((window as any).Pretext) {
-				logger.info('Pretext bundle loaded successfully.');
-			} else {
-				logger.error('Pretext not defined after script execution.');
-			}
-		} catch (err) {
-			logger.error('Failed to load Pretext bundle:', err);
-		}
 	}
 
 	private tryRegisterCodeMirrorExtension(): void {

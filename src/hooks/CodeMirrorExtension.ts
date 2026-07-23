@@ -8,13 +8,9 @@ import { logger } from '../utils/logger';
 type IdleDeadlineObj = { timeRemaining: () => number; didTimeout?: boolean };
 
 // CodeMirror module references - initialized lazily at runtime
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let EditorViewClass: any = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let DecorationClass: any = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let RangeSetBuilderClass: any = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let MeasureCompleteAnnotation: any = null;
 
 function getCodeMirrorModules(): boolean {

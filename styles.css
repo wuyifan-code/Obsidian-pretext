@@ -8,3 +8,11 @@
 [data-pretext-optimized] {
 	contain: layout;
 }
+
+.optimizer-stats .pretext-stat-label {
+	font-weight: 600;
+}
+
+.optimizer-stats .pretext-stat-value {
+	text-align: right;
+}

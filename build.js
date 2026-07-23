@@ -1,8 +1,4 @@
 const esbuild = require('esbuild');
-const fs = require('fs');
-
-// Read Pretext bundle
-const pretextBundle = fs.readFileSync('./lib/pretext/bundle.js', 'utf8');
 
 // Build main.js
 esbuild.build({
@@ -12,9 +8,6 @@ esbuild.build({
   external: ['obsidian', '@codemirror/view', '@codemirror/state'],
   format: 'cjs',
   target: 'es2018',
-  define: {
-    'INJECT_PRETEXT_BUNDLE': JSON.stringify(pretextBundle)
-  },
   minify: false,
   treeShaking: true,
 

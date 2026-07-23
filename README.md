@@ -2,7 +2,7 @@
 
 > Reduce DOM measurement overhead during rendering, improving performance for large documents.
 
-**Version**: 1.2.1 | **Requires**: Obsidian 1.10+
+**Version**: 1.2.2 | **Requires**: Obsidian 1.10+
 
 [中文文档](#中文文档) · [中文文档](README_zh.md) — see `README_zh.md` for the Chinese version.
 
@@ -46,7 +46,7 @@ When you open a note, Obsidian needs to measure the actual occupied size of text
 ### Manual
 
 1. Download the latest release
-2. Extract to `.obsidian/plugins/pretext-optimizer/`
+2. Extract to `.obsidian/plugins/obsidian-pretext/`
 3. Restart Obsidian and enable the plugin
 
 ## Development
@@ -94,7 +94,7 @@ MIT — see [LICENSE](LICENSE).
 
 > 减少渲染时的 DOM 测量开销，提升大型文档的渲染性能。
 
-**版本**: 1.2.1 | **要求**: Obsidian 1.10+
+**版本**: 1.2.2 | **要求**: Obsidian 1.10+
 
 ## 这个插件做什么
 
@@ -128,7 +128,7 @@ MIT — see [LICENSE](LICENSE).
 ### 手动
 
 1. 下载最新 release
-2. 解压到 `.obsidian/plugins/pretext-optimizer/`
+2. 解压到 `.obsidian/plugins/obsidian-pretext/`
 3. 重启 Obsidian，启用插件
 
 ## 开发
