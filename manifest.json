@@ -5,7 +5,7 @@
   "minAppVersion": "1.10.0",
   "description": "Integrates Pretext library to reduce DOM measurement overhead in the rendering pipeline, improving performance for large documents.",
   "author": "wuyifan-code",
-  "authorUrl": "",
+  "authorUrl": "https://github.com/wuyifan-code",
   "fundingUrl": "",
   "isDesktopOnly": false
 }

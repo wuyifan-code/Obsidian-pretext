@@ -1,10 +1,100 @@
 # Pretext Optimizer
 
-> 减少渲染时的 DOM 测量开销，提升大型文档的渲染性能。
+> Reduce DOM measurement overhead during rendering, improving performance for large documents.
 
-**版本**: 1.2.0 | **要求**: Obsidian 1.10+
+**Version**: 1.2.1 | **Requires**: Obsidian 1.10+
+
+[中文文档](#中文文档) · [中文文档](README_zh.md) — see `README_zh.md` for the Chinese version.
 
 ---
+
+## What it does
+
+When you open a note, Obsidian needs to measure the actual occupied size of text to set heights — this is called DOM measurement. Every measurement touches the render tree and is expensive. Pretext calculates heights at build time and sets `min-height` directly, letting the browser skip measurement.
+
+**Effects**:
+- Faster first-paint on long documents
+- Reduced reflow during scroll
+- Particularly helpful for large documents (callouts, blockquotes, tables)
+
+## How it works
+
+1. **Preview mode**: `MarkdownPostProcessor` captures the render, uses Pretext to compute height, sets `min-height`
+2. **Edit mode**: `CodeMirrorExtension` does the same on editor lines (Obsidian 1.5+)
+3. **Smart cache**: Identical text + identical font results are cached, avoiding repeated computation
+
+## Performance optimizations (v1.2.1)
+
+- **Local scanning**: `observeHeavyElements()` now only scans the visible content area, not the whole document
+- **RAF throttling**: DOM-mutation triggers are throttled via `requestAnimationFrame` to prevent duplicate processing
+- **Batched processing**: Preview mode processes at most 5 elements per batch, using `requestIdleCallback` for scheduling
+
+## Install
+
+### In Obsidian (after approval)
+
+1. Open **Settings → Community plugins**
+2. Search for "Pretext Optimizer"
+3. Click **Install**, then **Enable**
+
+### BRAT (recommended for beta)
+
+1. Install the **BRAT** plugin
+2. Command palette → `BRAT: Add a beta plugin` → enter `wuyifan-code/Obsidian-pretext`
+3. Enable "Pretext Optimizer"
+
+### Manual
+
+1. Download the latest release
+2. Extract to `.obsidian/plugins/pretext-optimizer/`
+3. Restart Obsidian and enable the plugin
+
+## Development
+
+```bash
+npm install
+npm test         # run tests
+npm run typecheck
+npm run build    # build main.js
+```
+
+### Project layout
+
+```
+src/
+├── analysis/           # tokenization, punctuation, whitespace
+│   ├── segmentation.ts
+│   ├── punctuation.ts
+│   └── whitespace.ts
+├── hooks/              # Obsidian extension points
+│   ├── CodeMirrorExtension.ts
+│   ├── MarkdownPostProcessor.ts
+│   └── HeavyElementOptimizer.ts
+├── PretextManager.ts   # Pretext core manager
+└── MeasurementCache.ts # measurement result cache
+```
+
+## Tech stack
+
+- **TypeScript** + **Vitest**
+- **[Pretext](https://github.com/chenglou/pretext)** by Cheng Lou — MIT License
+- **CodeMirror 6** (built into Obsidian)
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+---
+
+*Powered by [Pretext](https://github.com/chenglou/pretext) by Cheng Lou*
+
+---
+
+# 中文文档
+
+> 减少渲染时的 DOM 测量开销，提升大型文档的渲染性能。
+
+**版本**: 1.2.1 | **要求**: Obsidian 1.10+
 
 ## 这个插件做什么
 
@@ -75,7 +165,3 @@ src/
 ## 许可证
 
 MIT License。
-
----
-
-*Powered by [Pretext](https://github.com/chenglou/pretext) by Cheng Lou*
